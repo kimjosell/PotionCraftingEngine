@@ -144,9 +144,11 @@ EngineConfig parseEngineConfigJson(const json& root) {
         cfg.sourceObjects.emplace(it.key(), parseSourceObject(it.key(), it.value()));
     }
 
-    const json& altersJson = root.at("alter_objects");
-    for (auto it = altersJson.begin(); it != altersJson.end(); ++it) {
-        cfg.alterObjects.emplace(it.key(), parseAlterObject(it.key(), it.value()));
+    if (root.contains("alter_objects")) {
+        const json& altersJson = root.at("alter_objects");
+        for (auto it = altersJson.begin(); it != altersJson.end(); ++it) {
+            cfg.alterObjects.emplace(it.key(), parseAlterObject(it.key(), it.value()));
+        }
     }
 
     return cfg;
@@ -173,11 +175,14 @@ EngineConfig loadEngineConfigFromString(const std::string& jsonText) {
 
 EngineConfig loadEngineConfigFromFile(const std::string& path) {
     std::ifstream in(path);
-    if (!in) {
+    if (!in.is_open()) {
         throw ConfigParseError("could not open config file: " + path);
     }
     std::ostringstream buf;
     buf << in.rdbuf();
+    if (!in) {
+        throw ConfigParseError("error reading config file: " + path);
+    }
     return loadEngineConfigFromString(buf.str());
 }
 

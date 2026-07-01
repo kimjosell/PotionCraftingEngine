@@ -1,0 +1,92 @@
+#include "effect_engine/engine.h"
+#include "effect_engine/config_loader.h"
+
+#include <cassert>
+#include <iostream>
+#include <string>
+
+using namespace effect_engine;
+
+int main(int argc, char* argv[]) {
+    const std::string configPath = (argc > 1)
+        ? std::string(argv[1])
+        : "project_context/tea_alchemist_config-v1.0.0.json";
+
+    Engine engine;
+    try {
+        engine.load(configPath);
+        std::cout << "Engine loaded successfully from: " << configPath << "\n";
+    } catch (const ConfigParseError& e) {
+        std::cerr << "Failed to load engine: " << e.what() << "\n";
+        return 1;
+    }
+
+    try {
+        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+        std::cout << "getSourceObjectInfo(\"chamomile\", \"standard\"):\n";
+        std::cout << "  id:   " << chamomile.id   << "\n";
+        std::cout << "  tier: " << chamomile.tier  << "\n";
+        for (std::size_t k = 0; k < chamomile.dimensions.size(); ++k) {
+            const auto& d = chamomile.dimensions[k];
+            std::cout << "  domain[" << k << "]: ["
+                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
+        }
+    } catch (const EngineError& e) {
+        std::cerr << "Engine error: " << e.what() << "\n";
+        return 1;
+    }
+
+    try {
+        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+
+        // Self-check: subtracting an ingredient from itself with 0 elapsed time
+        // must zero out every dimension (a-a=0, no time modifier). Config-independent.
+        MysteriousObject zero = engine.mix(chamomile, chamomile, "subtract", 0);
+        assert(zero.id == "mysteriousObject");
+        for (const auto& d : zero.dimensions)
+            assert(d[0] == 0 && d[1] == 0 && d[2] == 0);
+        assert(zero.recipe && zero.recipe->operationId == "subtract");
+
+        MysteriousObject mixed = engine.mix(chamomile, chamomile, "add", 30);
+        std::cout << "mix(chamomile, chamomile, \"add\", 30):\n";
+        for (std::size_t k = 0; k < mixed.dimensions.size(); ++k) {
+            const auto& d = mixed.dimensions[k];
+            std::cout << "  domain[" << k << "]: ["
+                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
+        }
+    } catch (const EngineError& e) {
+        std::cerr << "mix error: " << e.what() << "\n";
+        return 1;
+    }
+
+    try {
+        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+
+        // Self-check: fire_focus exponents [1, 5] on chamomile [[4,2,3],[1,5,2]] (modulus 7).
+        // domain 0 exponent 1 = identity → unchanged; domain 1 exponent 5 → [1^5,5^5,2^5]%7 = [1,3,4].
+        MysteriousObject altered = engine.alter(chamomile, "fire_focus");
+        assert(altered.id == "mysteriousObject");
+        assert((altered.dimensions[0] == DimensionTriple{4, 2, 3}));
+        assert((altered.dimensions[1] == DimensionTriple{1, 3, 4}));
+        assert(altered.recipe && altered.recipe->operationId == "exponentiation");
+
+        std::cout << "alter(chamomile, \"fire_focus\"):\n";
+        for (std::size_t k = 0; k < altered.dimensions.size(); ++k) {
+            const auto& d = altered.dimensions[k];
+            std::cout << "  domain[" << k << "]: ["
+                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
+        }
+    } catch (const EngineError& e) {
+        std::cerr << "alter error: " << e.what() << "\n";
+        return 1;
+    }
+
+    try {
+        AlterObject unknown = engine.getAlterObjectInfo("fire_focus");
+        std::cout<< "Objecto encontrado con exito";
+    } catch (const EngineError& e) {
+        std::cout << "getAlterObjectInfo(\"fire_focus\"): " << e.what() << "\n";
+    }
+
+    return 0;
+}
