@@ -82,6 +82,28 @@ int main(int argc, char* argv[]) {
     }
 
     try {
+        // Self-check: craft chamomile standard [[4,2,3],[1,5,2]] (modulus 7).
+        // leaf coord [4,2,3] is 1.41 from calming_brew anchor [5,2,4] (radius 2.0) → candidate.
+        // root coord [1,5,2] is 6.16 from warming_brew (radius 2.0) → out of range, so
+        // harmony_tea (needs both domains in range) is not a candidate. Pure wins: calming_brew.
+        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+        MysteriousObject onlyChamomile{};
+        onlyChamomile.id = "mysteriousObject";
+        onlyChamomile.dimensions = chamomile.dimensions;
+        CraftedObject crafted = engine.craft(onlyChamomile);
+        assert(crafted.effect.effectId == "calming_brew");
+        assert(crafted.effect.activeDomains.size() == 1);
+        assert(crafted.effect.activeDomains.count("leaf") == 1);
+        std::cout << "craft(chamomile) -> effect: " << crafted.effect.effectId << "\n";
+        for (const auto& [domainId, dist] : crafted.effect.activeDomains) {
+            std::cout << "  active domain " << domainId << ": distance " << dist << "\n";
+        }
+    } catch (const EngineError& e) {
+        std::cerr << "craft error: " << e.what() << "\n";
+        return 1;
+    }
+
+    try {
         AlterObject unknown = engine.getAlterObjectInfo("fire_focus");
         std::cout<< "Objecto encontrado con exito";
     } catch (const EngineError& e) {

@@ -1,11 +1,24 @@
 #include "effect_engine/engine.h"
 #include "effect_engine/config_loader.h"
 
+#include <cmath>
+#include <limits>
+
 namespace effect_engine {
 
 namespace {
 // Handles negative operands (subtraction); see effect_system_design.md §13.
 int mod(int a, int m) { return ((a % m) + m) % m; }
+
+// Euclidean distance between a domain coordinate and an anchor (3 dims).
+float domainDistance(const DimensionTriple& p, const DimensionTriple& q) {
+    float sum = 0.0f;
+    for (std::size_t i = 0; i < kDimensionsPerDomain; ++i) {
+        const float d = static_cast<float>(p[i] - q[i]);
+        sum += d * d;
+    }
+    return std::sqrt(sum);
+}
 
 // (base ^ exp) mod m, exp >= 0. Square-and-multiply keeps intermediates bounded.
 int modpow(int base, int exp, int m) {
@@ -22,6 +35,105 @@ int modpow(int base, int exp, int m) {
 
 void Engine::load(const std::string& configPath) {
     engineConfig_ = loadEngineConfigFromFile(configPath);
+}
+
+CraftedObject Engine::craft(const MysteriousObject& mysteriousObject) const {
+    const std::size_t domainCount = engineConfig_.domains.size();
+    if (mysteriousObject.dimensions.size() != domainCount) {
+        throw EngineError("mysterious object domain count does not match engine domain count");
+    }
+
+    // domain id -> coordinate index (anchors reference domains by id).
+    std::unordered_map<std::string, std::size_t> domainIndex;
+    for (std::size_t k = 0; k < domainCount; ++k) {
+        domainIndex.emplace(engineConfig_.domains[k].id, k);
+    }
+    const std::vector<DimensionTriple>& coords = mysteriousObject.dimensions;
+
+    constexpr float kInf = std::numeric_limits<float>::infinity();
+
+    // --- Step 1: dominant pure effect (design paper §6, §10 Step 1) ---
+    // Per domain: nearest anchor within its capture radius; if none is in range,
+    // fall back to the nearest anchor regardless of radius. Best (smallest) local
+    // score across all domains wins. Strict '<' keeps the earlier config entry on ties.
+    const PureEffectConfig* dominantPure = nullptr;
+    float bestPureScore = kInf;
+    for (std::size_t k = 0; k < domainCount; ++k) {
+        const std::string& domainId = engineConfig_.domains[k].id;
+        const PureEffectConfig* candidateWinner = nullptr;
+        float candidateScore = kInf;
+        const PureEffectConfig* anyWinner = nullptr;
+        float anyScore = kInf;
+        for (const PureEffectConfig& pe : engineConfig_.pureEffects) {
+            if (pe.anchor.domain != domainId) continue;
+            const float dist = domainDistance(coords[k], pe.anchor.anchor);
+            if (dist < anyScore) { anyScore = dist; anyWinner = &pe; }
+            if (dist <= pe.anchor.captureRadius && dist < candidateScore) {
+                candidateScore = dist;
+                candidateWinner = &pe;
+            }
+        }
+        const PureEffectConfig* localWinner = candidateWinner ? candidateWinner : anyWinner;
+        const float localScore = candidateWinner ? candidateScore : anyScore;
+        if (localWinner && localScore < bestPureScore) {
+            bestPureScore = localScore;
+            dominantPure = localWinner;
+        }
+    }
+
+    // --- Step 2: dominant combined effect (design paper §7, §10 Step 2) ---
+    // Candidate only if every participating domain is within its capture radius.
+    // Score is the average per-domain distance.
+    const CombinedEffectConfig* bestCombined = nullptr;
+    float bestCombinedScore = kInf;
+    for (const CombinedEffectConfig& ce : engineConfig_.combinedEffects) {
+        float sum = 0.0f;
+        bool allInRange = true;
+        for (const AnchorConfig& a : ce.anchors) {
+            auto idxIt = domainIndex.find(a.domain);
+            if (idxIt == domainIndex.end()) {
+                throw EngineError("combined effect '" + ce.id +
+                                  "' references unknown domain: " + a.domain);
+            }
+            const float dist = domainDistance(coords[idxIt->second], a.anchor);
+            if (dist > a.captureRadius) { allInRange = false; break; }
+            sum += dist;
+        }
+        if (!allInRange || ce.anchors.empty()) continue;
+        const float score = sum / static_cast<float>(ce.anchors.size());
+        if (score < bestCombinedScore) {
+            bestCombinedScore = score;
+            bestCombined = &ce;
+        }
+    }
+
+    // --- Step 3: dominance decision (design paper §8, §10 Step 3) ---
+    // Combined wins only if strictly closer than the pure score scaled by its own β;
+    // '<' means an exact tie prefers the pure effect.
+    const bool combinedWins =
+        bestCombined && bestCombinedScore < bestPureScore * bestCombined->beta;
+
+    if (!combinedWins && !dominantPure) {
+        throw EngineError("no effect could be resolved: config has no pure effects");
+    }
+
+    Effect effect{};
+    effect.dimensions = coords; // final crafted coordinates are unchanged by craft
+    if (combinedWins) {
+        effect.effectId = bestCombined->id;
+        for (const AnchorConfig& a : bestCombined->anchors) {
+            const std::size_t idx = domainIndex.at(a.domain);
+            effect.activeDomains[a.domain] = domainDistance(coords[idx], a.anchor);
+        }
+    } else {
+        effect.effectId = dominantPure->id;
+        effect.activeDomains[dominantPure->anchor.domain] = bestPureScore;
+    }
+
+    CraftedObject crafted{};
+    crafted.recipe = mysteriousObject.recipe; // preserved through craft (architecture §10)
+    crafted.effect = std::move(effect);
+    return crafted;
 }
 
 MysteriousObject Engine::mix(const Ingredient& ingredientA, const Ingredient& ingredientB,

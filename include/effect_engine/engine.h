@@ -90,7 +90,7 @@ class Engine {
 public:
     void load(const std::string& configPath);
 
-    // CraftedObject    craft(const MysteriousObject& mysteriousObject) const;
+    CraftedObject    craft(const MysteriousObject& mysteriousObject) const;
     MysteriousObject mix(const Ingredient& ingredientA, const Ingredient& ingredientB,
                          const std::string& operationId, int elapsedTime) const;
     MysteriousObject alter(const Ingredient& ingredient,
