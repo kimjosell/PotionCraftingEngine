@@ -98,8 +98,46 @@ int main(int argc, char* argv[]) {
         for (const auto& [domainId, dist] : crafted.effect.activeDomains) {
             std::cout << "  active domain " << domainId << ": distance " << dist << "\n";
         }
+
+        // Self-check: an object at the origin is far from every anchor (leaf and root
+        // anchors sit near [5,2,4]/[6,3,5] with radius 2.0–2.5), so no effect is a
+        // candidate → null effect: empty id, empty active domains.
+        MysteriousObject deadZone{};
+        deadZone.id = "mysteriousObject";
+        deadZone.dimensions = {DimensionTriple{0, 0, 0}, DimensionTriple{0, 0, 0}};
+        CraftedObject nullCraft = engine.craft(deadZone);
+        assert(nullCraft.effect.effectId.empty());
+        assert(nullCraft.effect.activeDomains.empty());
+        std::cout << "craft(dead zone) -> null effect (no dominant effect)\n";
     } catch (const EngineError& e) {
         std::cerr << "craft error: " << e.what() << "\n";
+        return 1;
+    }
+
+    try {
+        // Experiment: mix two ingredients, then craft the mysterious object it produces.
+        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+        SourceObject ginger    = engine.getSourceObjectInfo("ginger", "standard");
+
+        MysteriousObject brew = engine.mix(chamomile, ginger, "add", 0);
+        std::cout << "mix(chamomile, ginger, \"add\", 0):\n";
+        for (std::size_t k = 0; k < brew.dimensions.size(); ++k) {
+            const auto& d = brew.dimensions[k];
+            std::cout << "  domain[" << k << "]: ["
+                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
+        }
+
+        CraftedObject crafted = engine.craft(brew);
+        if (crafted.effect.effectId.empty()) {
+            std::cout << "craft(brew) -> null effect (landed in a dead zone)\n";
+        } else {
+            std::cout << "craft(brew) -> effect: " << crafted.effect.effectId << "\n";
+            for (const auto& [domainId, dist] : crafted.effect.activeDomains) {
+                std::cout << "  active domain " << domainId << ": distance " << dist << "\n";
+            }
+        }
+    } catch (const EngineError& e) {
+        std::cerr << "mix+craft experiment error: " << e.what() << "\n";
         return 1;
     }
 

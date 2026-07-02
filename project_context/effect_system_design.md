@@ -227,7 +227,7 @@ Before the dominance competition runs, effects that are out of range are elimina
 
 **For combined effects:** `dist(dₖⱼ, anchorₖⱼ) ≤ capture_radiusₖⱼ` for **every** participating domain j.
 
-If no effects are candidates (the crafted object lands in a "dead zone" far from all anchors), the system falls back to the nearest pure effect regardless of capture radius — every crafted object must have exactly one dominant effect.
+If no effects are candidates (the crafted object lands in a "dead zone" far from all anchors), the craft resolves to a **null effect** — there is no dead-zone fallback to the nearest pure effect. A null effect is a valid crafted result: the crafted object still carries its coordinates and recipe, but expresses no dominant effect (empty effect id, empty active-domains map). A crafted object therefore has **at most one** dominant effect: exactly one when at least one effect is a candidate, and none when the object lands in a dead zone.
 
 ---
 
@@ -242,6 +242,8 @@ local_score(k)  = min over candidate anchors p in domain k:  dist(dₖ, Pₖ_p)
 local_winner(k) = anchor p achieving that minimum
 ```
 
+Only anchors within their capture radius are candidates. If a domain has no candidate, it contributes no local winner (there is no fallback to the nearest out-of-range anchor).
+
 ### Step 2 — Global dominant pure effect
 
 The dominant pure effect is whichever domain produced the smallest local score:
@@ -251,6 +253,8 @@ best_pure_score  = min over k:  local_score(k)
 best_pure_domain = k achieving that minimum
 dominant_pure    = local_winner(best_pure_domain)
 ```
+
+If no domain produced a candidate, there is no dominant pure effect (`dominant_pure = none`).
 
 **Design rationale:** "Strongest signal wins" — the domain most precisely expressing an effect speaks for the whole object. Players know which domain an effect comes from, so they can learn to deliberately strengthen specific domains over time.
 
@@ -348,12 +352,12 @@ Step 1 — Pure effect candidates
       if dist(dₖ, Pₖ_p) ≤ capture_radius(p):
         add p to candidates(k)
     local_score(k)  = min dist over candidates(k)
-                      (if no candidates: use nearest anchor regardless of radius)
+                      (if no candidates: domain k has no local winner)
     local_winner(k) = anchor achieving local_score(k)
 
-  best_pure_score  = min over k: local_score(k)
+  best_pure_score  = min over k: local_score(k)   (none if no domain had a candidate)
   best_pure_domain = k achieving that minimum
-  dominant_pure    = local_winner(best_pure_domain)
+  dominant_pure    = local_winner(best_pure_domain)  (none if best_pure_score is none)
 
 Step 2 — Combined effect candidates
   For each combined effect E spanning domains {k₁, ..., kₘ}:
@@ -366,15 +370,21 @@ Step 2 — Combined effect candidates
 
 Step 3 — Dominance decision
   if combined_candidates is not empty:
-    threshold = best_pure_score × β(best_combined_effect)
-    if best_combined_score < threshold:
-      dominant effect = best_combined_effect
+    if dominant_pure is none:
+      dominant effect = best_combined_effect        // no pure competitor
     else:
-      dominant effect = dominant_pure
-  else:
+      threshold = best_pure_score × β(best_combined_effect)
+      if best_combined_score < threshold:
+        dominant effect = best_combined_effect
+      else:
+        dominant effect = dominant_pure
+  else if dominant_pure is not none:
     dominant effect = dominant_pure
+  else:
+    dominant effect = null            // dead zone: no candidate at all
 
-Output: one dominant effect (pure or combined), with domain attribution
+Output: at most one dominant effect (pure or combined) with domain attribution,
+        or a null effect if the crafted object landed in a dead zone
 ```
 
 ---
@@ -383,7 +393,7 @@ Output: one dominant effect (pure or combined), with domain attribution
 
 | Principle | Decision |
 |---|---|
-| One effect per crafted object | Yes — always exactly one dominant effect |
+| One effect per crafted object | At most one — one dominant effect when in range, null effect in a dead zone (no fallback) |
 | Pure effects shared across domains | No — each domain has its own independent anchor set |
 | Combined effects require all participating domains in range | Yes — all must be within capture radius simultaneously |
 | Dominant pure effect selection | Strongest signal wins (smallest distance, any domain) |

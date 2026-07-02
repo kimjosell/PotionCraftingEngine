@@ -93,7 +93,7 @@ Because both subtypes inherit from `Ingredient`, mix and alter accept either as 
 
 **`CraftedObject`** — the output of `craft()`. Carries:
 - `recipe: Recipe` — the full operation tree that produced this craft (see §8).
-- `effect: Effect` — the dominant effect with its id, the crafted object's final dimensions, and the active domains map.
+- `effect: Effect` — the dominant effect with its id, the crafted object's final dimensions, and the active domains map. If the crafted object landed outside every capture radius (a dead zone), the effect is **null**: an empty effect id and an empty active-domains map, while the dimensions are still populated. See the design paper §5.
 
 The library is stateless about all of these — value objects are owned and persisted by the game.
 
@@ -449,10 +449,11 @@ Both mix and alter attach a `Recipe` to the returned `MysteriousObject` describi
 // The recipe field is preserved on the CraftedObject.
 CraftedObject crafted = effect_engine_craft(engine, mysterious, &error);
 
-const char* effect_id      = crafted.effect.effect_id;
-const char* effect_type    = crafted.effect.effect_type;      // "pure" or "combined"
+const char* effect_id      = crafted.effect.effect_id;   // empty string == null effect (dead zone)
+const char* effect_type    = crafted.effect.effect_type;      // "pure" or "combined" ("" when null)
 // active_domains maps each participating domain id to the distance
-// from the crafted object's coordinate to that domain's effect anchor
+// from the crafted object's coordinate to that domain's effect anchor.
+// Empty (n_active == 0) when the effect is null.
 const ActiveDomain* active_domains = crafted.effect.active_domains;
 size_t              n_active        = crafted.effect.n_active_domains;
 // Full recipe tree, available for replay, display, or serialization by the game
@@ -702,7 +703,7 @@ CMake from a single `CMakeLists.txt`:
 
 3. **Time unit convention:** `time_per_point` is an opaque integer unit — the game decides what it represents (real seconds, in-game ticks, in-game minutes). This must be documented clearly in the config schema so different games use it consistently.
 
-4. **Dead zone fallback behavior:** If a crafted object lands outside all effect capture zones (no candidates at all), the current design falls back to the nearest pure effect regardless of radius. This should be confirmed as the intended behavior and whether a special "null effect" or "neutral" result is preferable in some designs.
+4. **Dead zone behavior:** ~~If a crafted object lands outside all effect capture zones (no candidates at all), the current design falls back to the nearest pure effect regardless of radius.~~ **Resolved:** a crafted object that lands outside every capture zone resolves to a **null effect** (empty effect id, empty active-domains map) — there is no fallback to the nearest pure effect. The crafted object still carries its coordinates and recipe. The game decides how to present a null result (e.g., "failed brew", inert item).
 
 5. **Recipe tree memory representation across the FFI boundary:** Recipes are recursive trees. The C API must expose them in a way that game-engine bindings (Godot, Unity, Unreal) can walk without exposing C++ ownership semantics. Options: opaque handles + accessor functions, or a fully flattened serialized form returned alongside the tree. Decide before writing the first binding.
 

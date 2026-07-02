@@ -53,28 +53,24 @@ CraftedObject Engine::craft(const MysteriousObject& mysteriousObject) const {
     constexpr float kInf = std::numeric_limits<float>::infinity();
 
     // --- Step 1: dominant pure effect (design paper §6, §10 Step 1) ---
-    // Per domain: nearest anchor within its capture radius; if none is in range,
-    // fall back to the nearest anchor regardless of radius. Best (smallest) local
-    // score across all domains wins. Strict '<' keeps the earlier config entry on ties.
+    // Per domain: nearest anchor within its capture radius. Anchors out of range are
+    // ignored — there is no dead-zone fallback (a craft with no candidate anywhere
+    // yields a null effect in Step 3). Best (smallest) local score across all domains
+    // wins. Strict '<' keeps the earlier config entry on ties.
     const PureEffectConfig* dominantPure = nullptr;
     float bestPureScore = kInf;
     for (std::size_t k = 0; k < domainCount; ++k) {
         const std::string& domainId = engineConfig_.domains[k].id;
-        const PureEffectConfig* candidateWinner = nullptr;
-        float candidateScore = kInf;
-        const PureEffectConfig* anyWinner = nullptr;
-        float anyScore = kInf;
+        const PureEffectConfig* localWinner = nullptr;
+        float localScore = kInf;
         for (const PureEffectConfig& pe : engineConfig_.pureEffects) {
             if (pe.anchor.domain != domainId) continue;
             const float dist = domainDistance(coords[k], pe.anchor.anchor);
-            if (dist < anyScore) { anyScore = dist; anyWinner = &pe; }
-            if (dist <= pe.anchor.captureRadius && dist < candidateScore) {
-                candidateScore = dist;
-                candidateWinner = &pe;
+            if (dist <= pe.anchor.captureRadius && dist < localScore) {
+                localScore = dist;
+                localWinner = &pe;
             }
         }
-        const PureEffectConfig* localWinner = candidateWinner ? candidateWinner : anyWinner;
-        const float localScore = candidateWinner ? candidateScore : anyScore;
         if (localWinner && localScore < bestPureScore) {
             bestPureScore = localScore;
             dominantPure = localWinner;
@@ -108,15 +104,17 @@ CraftedObject Engine::craft(const MysteriousObject& mysteriousObject) const {
     }
 
     // --- Step 3: dominance decision (design paper §8, §10 Step 3) ---
-    // Combined wins only if strictly closer than the pure score scaled by its own β;
+    // If a combined effect is a candidate it wins when strictly closer than the pure
+    // score scaled by its own β (and always when there is no pure candidate to beat).
     // '<' means an exact tie prefers the pure effect.
-    const bool combinedWins =
-        bestCombined && bestCombinedScore < bestPureScore * bestCombined->beta;
-
-    if (!combinedWins && !dominantPure) {
-        throw EngineError("no effect could be resolved: config has no pure effects");
+    bool combinedWins = false;
+    if (bestCombined) {
+        combinedWins = !dominantPure ||
+                       bestCombinedScore < bestPureScore * bestCombined->beta;
     }
 
+    // Null effect: the craft landed outside every capture radius (pure and combined).
+    // Signalled by an empty effectId and empty activeDomains (design paper §5).
     Effect effect{};
     effect.dimensions = coords; // final crafted coordinates are unchanged by craft
     if (combinedWins) {
@@ -125,7 +123,7 @@ CraftedObject Engine::craft(const MysteriousObject& mysteriousObject) const {
             const std::size_t idx = domainIndex.at(a.domain);
             effect.activeDomains[a.domain] = domainDistance(coords[idx], a.anchor);
         }
-    } else {
+    } else if (dominantPure) {
         effect.effectId = dominantPure->id;
         effect.activeDomains[dominantPure->anchor.domain] = bestPureScore;
     }

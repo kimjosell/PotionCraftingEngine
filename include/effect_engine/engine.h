@@ -49,6 +49,8 @@ struct AlterObject {
 // ---- Effect and CraftedObject ----
 
 struct Effect {
+    // Null effect (craft landed outside every capture radius): effectId is empty and
+    // activeDomains is empty. Otherwise effectId names the dominant pure/combined effect.
     std::string effectId;
     std::vector<DimensionTriple> dimensions;               // final crafted coordinates
     std::unordered_map<std::string, float> activeDomains;  // domain_id -> distance to anchor
