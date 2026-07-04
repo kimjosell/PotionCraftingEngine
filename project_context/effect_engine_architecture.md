@@ -27,18 +27,18 @@ All content — domain names, effect anchors, capture radii, source object value
 
 ### Fixed shape, flexible content
 
-| Fixed by engine | Configurable by developer |
-|---|---|
-| 3 dimensions per domain | Number of domains |
-| Euclidean distance formula | Modulus (value range per dimension) |
-| β-threshold dominance algorithm | Pure effect anchors, capture radii (per effect) |
-| Average-based combined score | Combined effect anchors, domain spans, capture radii, β (per effect) |
-| Tier system shape for source objects | Source object definitions and tier values |
-| Modulus applied after every operation | Time modifier config per mix operation type |
-| Min 2 / max domain_count for combined spans | Number of source objects, alter objects, and effects |
-| Alter object shape (one exponent per domain) | Alter object definitions and exponent values |
-| Alter exponent range `[1, modulus-2]` | Which exponents each alter object uses |
-| Alter has no time modifier | — |
+| Fixed by engine                              | Configurable by developer                                            |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| 3 dimensions per domain                      | Number of domains                                                    |
+| Euclidean distance formula                   | Modulus (value range per dimension)                                  |
+| β-threshold dominance algorithm              | Pure effect anchors, capture radii (per effect)                      |
+| Average-based combined score                 | Combined effect anchors, domain spans, capture radii, β (per effect) |
+| Tier system shape for source objects         | Source object definitions and tier values                            |
+| Modulus applied after every operation        | Time modifier config per mix operation type                          |
+| Min 2 / max domain_count for combined spans  | Number of source objects, alter objects, and effects                 |
+| Alter object shape (one exponent per domain) | Alter object definitions and exponent values                         |
+| Alter exponent range `[1, modulus-2]`        | Which exponents each alter object uses                               |
+| Alter has no time modifier                   | —                                                                    |
 
 ### Stateful about config, stateless about game objects
 
@@ -92,6 +92,7 @@ Because both subtypes inherit from `Ingredient`, mix and alter accept either as 
 **Family 2: AlterObject (exponent-based).** `AlterObject` is a structurally distinct value type with `id: String` and `exponents: int[]` (one exponent per domain, each in `[1, modulus-2]`). It is **not an `Ingredient`** — it has no dimensions, cannot be mixed, and cannot be the target of an alter. The library exposes AlterObjects through `get_alter_object_info(id)` for read-only inspection by the game (e.g., to display in UI), but the public `alter()` API takes alter objects by **id string**, not by reference. This keeps the FFI boundary simple and makes recipes trivially serializable.
 
 **`CraftedObject`** — the output of `craft()`. Carries:
+
 - `recipe: Recipe` — the full operation tree that produced this craft (see §8).
 - `effect: Effect` — the dominant effect with its id, the crafted object's final dimensions, and the active domains map. If the crafted object landed outside every capture radius (a dead zone), the effect is **null**: an empty effect id and an empty active-domains map, while the dimensions are still populated. See the design paper §5.
 
@@ -136,9 +137,9 @@ Single step. No time modifier. Within a domain, all 3 dimensions use the same ex
 
 ### Time modifier config (per mix operation type)
 
-| Parameter | Meaning |
-|---|---|
-| `max_modifier` | Maximum modifier points before cycling back to 0 |
+| Parameter        | Meaning                                            |
+| ---------------- | -------------------------------------------------- |
+| `max_modifier`   | Maximum modifier points before cycling back to 0   |
 | `time_per_point` | Time units required for modifier to increment by 1 |
 
 The modifier cycles — waiting indefinitely does not push values in one direction forever. This prevents time from becoming a trivial farming vector while still rewarding players who learn the rhythm of specific mix operation types. Alter has no time configuration.
@@ -241,6 +242,7 @@ Values outside [0, modulus-1] are mechanically equivalent to their mod-reduced c
 ### Validation
 
 At config load time the engine checks:
+
 - Every source object tier has exactly `domain_count` subarrays
 - Every subarray has exactly 3 values
 - Every value is in [0, modulus-1]
@@ -283,6 +285,7 @@ Under prime modulus, exponents are cyclic with period `modulus-1` by Fermat's Li
 ### Validation
 
 At config load time the engine checks:
+
 - Every alter object has exactly `domain_count` exponents
 - Every exponent is in `[1, modulus-2]`
 - At least one exponent is different from 1 (rejects the identity alter object)
@@ -359,6 +362,7 @@ Three intended use cases:
 The engine builds recipes and returns them attached to mysterious and crafted objects, but **does not persist them**. If the game wants to save a craft and reload it later — preserving the recipe — the game serializes the tree itself using whatever format suits its save system. The recipe contains only ids (`SourceObject.id`, `SourceObject.tier`, `"mysteriousObject"`, `alterObjectId`, `operationId`) and primitive data (`time`, `dimensions`), so any standard serializer (JSON, binary, protobuf) works.
 
 When the game reloads a serialized recipe, it can either:
+
 - Treat it as opaque data for display purposes, or
 - Replay it through the engine to regenerate the corresponding `MysteriousObject` or `CraftedObject` from scratch (since operations are deterministic given the same inputs and time values).
 
@@ -387,6 +391,14 @@ Time variation multiplies each mix branch further — with `max_modifier = 5`, e
 ## 10. API Design (Conceptual)
 
 The public API is a **C API** (not C++) for maximum portability across languages and engines via FFI.
+
+> **As-built note.** This C API is now implemented in `include/effect_engine/effect_engine_c.h` (declarations) and `src/effect_engine_c.cpp` (implementation), built as the shared library target `effect_engine_c` (`.dll`/`.so`/`.dylib`). The pseudocode below is conceptual; the header is the source of truth. Two representation decisions were finalized (resolving Open Questions §15.1 and §15.5):
+>
+> - **Objects cross the boundary as opaque handles.** `EEIngredient*` (a source or mysterious object) and `EECrafted*` (a craft result) are heap-allocated by the engine and owned by the caller, who frees them with `effect_engine_ingredient_free` / `effect_engine_crafted_free`. This keeps the recipe tree alive on the C++ side and avoids exposing any struct layout to the ABI. Coordinates, exponents, and active-domain distances are read out through accessor functions as flat `int`/`float` arrays and index-addressed strings.
+> - **Errors use return-code + last-error string.** Fallible functions return `NULL` (handles) or `-1` (int accessors) on failure; the reason is retrievable via `effect_engine_last_error()`, a thread-local string that is `""` when the last call succeeded. There is no error out-param.
+> - **`craft()` requires a mysterious object** (produced by `mix`/`alter`), matching the type discipline in the design docs; passing a raw source object is rejected with an error.
+> - **Config UI queries** use a count + index-accessor pattern (`effect_engine_domain_count` / `effect_engine_domain_id`, and likewise for sources, tiers, and alter objects) instead of returning string arrays, which is trivial to bind from any FFI host.
+> - **Recipe tree traversal across the FFI is deferred** (Open Question §15.6 defers replay). The recipe stays alive inside the `EEIngredient`/`EECrafted` handle and accessor functions to walk it can be added later without changing the marshaling model.
 
 ### Lifecycle
 
@@ -435,6 +447,7 @@ MysteriousObject result = effect_engine_alter(
 ```
 
 The library validates rules at the API boundary and returns an error on mismatches:
+
 - Mix rejects an unknown `operation_id` (anything not in the config's `operations` block).
 - Mix rejects an Ingredient whose dimensions do not match the engine's domain count.
 - Alter rejects an unknown `alter_object_id`.
@@ -573,6 +586,7 @@ The operations block configures the time modifier behavior of the **mix** operat
 ```
 
 Notes on capture_radius and β:
+
 - `capture_radius` controls whether the effect is a candidate at all — it defines the landing zone sphere
 - `β` controls how the combined effect competes against the best pure effect once it is a candidate
 - These are independent knobs and should be tuned separately
@@ -657,6 +671,7 @@ The same compiled binary works for Unity via **P/Invoke**. Unreal requires a thi
 ### Cross-platform compilation
 
 CMake from a single `CMakeLists.txt`:
+
 - Windows: `.dll` / Linux: `.so` / macOS: `.dylib`
 - Web via Emscripten: deferred
 
@@ -664,40 +679,40 @@ CMake from a single `CMakeLists.txt`:
 
 ## 13. Scope for First Version
 
-| Item | Target |
-|---|---|
-| Number of domains | 4 (Water, Fire, Earth, Wind) |
-| Modulus | 11 (values 0–10) |
-| Source objects | 10–15, each with 2 tiers |
-| Alter objects | 5–8 distinct, no tiers |
-| Pure effects | ~20 total across all domains |
-| Combined effects | A handful (2–4) spanning 2 domains each |
-| Mix operations | 3 (add, subtract, multiply) with time modifier |
-| Alter operation | 1, no time modifier |
-| Primary game engine | Godot |
-| Config format | Single JSON file |
+| Item                | Target                                         |
+| ------------------- | ---------------------------------------------- |
+| Number of domains   | 4 (Water, Fire, Earth, Wind)                   |
+| Modulus             | 11 (values 0–10)                               |
+| Source objects      | 10–15, each with 2 tiers                       |
+| Alter objects       | 5–8 distinct, no tiers                         |
+| Pure effects        | ~20 total across all domains                   |
+| Combined effects    | A handful (2–4) spanning 2 domains each        |
+| Mix operations      | 3 (add, subtract, multiply) with time modifier |
+| Alter operation     | 1, no time modifier                            |
+| Primary game engine | Godot                                          |
+| Config format       | Single JSON file                               |
 
 ---
 
 ## 14. Deliberately Deferred
 
-| Item | Why deferred |
-|---|---|
-| Visual config editor | Config is small enough to edit by hand for v1 |
-| Procedural source object value generation | Adds complexity, undermines learnability |
-| Player upgrade paths between tiers | Not in first game's acquisition model |
-| Alter object tiers | Modular exponentiation has no natural ordering — tiers don't map cleanly |
-| Web/WASM export | Emscripten adds build complexity |
-| Save state in the library | Game concern, not engine concern |
-| More than 3 dimensions per domain | Fixed by design to keep validation tractable |
-| Per-dimension exponents in alter objects | One exponent per domain keeps the player's mental model tractable |
-| Multiple config files | Deferred until config outgrows a single file |
+| Item                                      | Why deferred                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------ |
+| Visual config editor                      | Config is small enough to edit by hand for v1                            |
+| Procedural source object value generation | Adds complexity, undermines learnability                                 |
+| Player upgrade paths between tiers        | Not in first game's acquisition model                                    |
+| Alter object tiers                        | Modular exponentiation has no natural ordering — tiers don't map cleanly |
+| Web/WASM export                           | Emscripten adds build complexity                                         |
+| Save state in the library                 | Game concern, not engine concern                                         |
+| More than 3 dimensions per domain         | Fixed by design to keep validation tractable                             |
+| Per-dimension exponents in alter objects  | One exponent per domain keeps the player's mental model tractable        |
+| Multiple config files                     | Deferred until config outgrows a single file                             |
 
 ---
 
 ## 15. Open Questions
 
-1. **Error handling strategy in the C API:** Return codes + error string out-param (simple, portable) vs. a more structured error type. Decide before writing the first binding.
+1. **Error handling strategy in the C API:** ~~Return codes + error string out-param (simple, portable) vs. a more structured error type.~~ **Resolved:** fallible functions return `NULL`/`-1` and set a thread-local last-error string retrieved via `effect_engine_last_error()` (no out-param). Simple and portable across all FFI hosts.
 
 2. **MysteriousObject and AlterObject serialization formats:** MysteriousObject values are always in [0, modulus-1] and can be serialized as a flat integer array of size `domain_count × 3`. AlterObject can be serialized as a flat integer array of size `domain_count`. Confirm and document the final memory layouts explicitly so game developers know exactly what to persist.
 
@@ -705,7 +720,7 @@ CMake from a single `CMakeLists.txt`:
 
 4. **Dead zone behavior:** ~~If a crafted object lands outside all effect capture zones (no candidates at all), the current design falls back to the nearest pure effect regardless of radius.~~ **Resolved:** a crafted object that lands outside every capture zone resolves to a **null effect** (empty effect id, empty active-domains map) — there is no fallback to the nearest pure effect. The crafted object still carries its coordinates and recipe. The game decides how to present a null result (e.g., "failed brew", inert item).
 
-5. **Recipe tree memory representation across the FFI boundary:** Recipes are recursive trees. The C API must expose them in a way that game-engine bindings (Godot, Unity, Unreal) can walk without exposing C++ ownership semantics. Options: opaque handles + accessor functions, or a fully flattened serialized form returned alongside the tree. Decide before writing the first binding.
+5. **Recipe tree memory representation across the FFI boundary:** ~~Recipes are recursive trees. The C API must expose them in a way that game-engine bindings can walk without exposing C++ ownership semantics.~~ **Resolved (representation):** value objects cross as **opaque handles** (`EEIngredient*`, `EECrafted*`) owned by the caller, with accessor functions for coordinates and effect data. The recipe tree stays alive inside the handle. **Traversal accessors deferred** to Open Question §15.6 (replay) — no binding needs to walk the tree yet, and they can be added later without changing the handle model.
 
 6. **Recipe replay API:** Whether the engine should expose a `replay(recipe) → MysteriousObject` function that walks a serialized recipe tree and re-executes it. Useful for save/load and tutorials, but adds API surface. Defer until a concrete use case demands it.
 
@@ -722,4 +737,4 @@ CMake from a single `CMakeLists.txt`:
 
 ---
 
-*This document should be read alongside `effect_system_design.md`, which contains the mathematical formulas and effect system logic in full detail.*
+_This document should be read alongside `effect_system_design.md`, which contains the mathematical formulas and effect system logic in full detail._

@@ -102,6 +102,9 @@ public:
                                      const std::string& tier) const;
     AlterObject  getAlterObjectInfo(const std::string& alterObjectId) const;
 
+    // Read-only config access — used by the C API for UI list queries.
+    const EngineConfig& config() const noexcept { return engineConfig_; }
+
 private:
     EngineConfig engineConfig_;
 };
