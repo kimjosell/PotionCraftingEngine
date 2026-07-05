@@ -1,0 +1,76 @@
+name: Build & Release libraries
+
+# Corre al empujar un tag vX.Y.Z, o manualmente desde la pestaña Actions.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+            lib: build/libeffect_engine_c.so
+          - os: macos-latest
+            name: macos
+            lib: build/libeffect_engine_c.dylib
+          - os: windows-latest
+            name: windows
+            lib: build/Release/effect_engine_c.dll
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nlohmann_json (Linux)
+        if: matrix.name == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y nlohmann-json3-dev
+
+      - name: Install nlohmann_json (macOS)
+        if: matrix.name == 'macos'
+        run: brew install nlohmann-json
+
+      - name: Install nlohmann_json (Windows)
+        if: matrix.name == 'windows'
+        run: vcpkg install nlohmann-json:x64-windows
+
+      - name: Configure
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          ${{ matrix.name == 'windows' && '-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+
+      - name: Build
+        run: cmake --build build --config Release --target effect_engine_c
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir dist
+          cp "${{ matrix.lib }}" dist/
+          cp -r include dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: effect_engine-${{ matrix.name }}
+          path: dist/
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Zip per platform
+        run: |
+          cd artifacts
+          for d in */; do zip -r "../${d%/}.zip" "$d"; done
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"
