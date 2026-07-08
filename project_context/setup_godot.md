@@ -25,16 +25,14 @@ spell both out: (a) telling SConstruct where our header and `.dylib` live (step 
 
 Skim this once, then follow the numbered sections.
 
-1. **Build our library** (see the main guide's build section) → you get
-   `libeffect_engine_c.dylib` (or `.dll`/`.so`) and the header `effect_engine_c.h`.
-2. **Drop those two into your godot-cpp project** under `libs/effect_engine/` (§1).
-3. **Teach SConstruct about them** — a few lines for include path, link, and (macOS) rpath (§2).
-4. **Add the wrapper classes** (`ee_wrapper.h`) to `src/` (§3).
-5. **Register the classes** in `register_types.cpp` (§4).
-6. **Build with `scons`** — the compiled extension lands in your demo project's `bin/`.
-7. **Put our `.dylib` where the extension can load it** (macOS: *inside* the `.framework`),
+1. **Drop those two into your godot-cpp project** under `libs/effect_engine/` (§1).
+2. **Teach SConstruct about them** — a few lines for include path, link, and (macOS) rpath (§2).
+3. **Add the wrapper classes** (`ee_wrapper.h`) to `src/` (§3).
+4. **Register the classes** in `register_types.cpp` (§4).
+5. **Build with `scons`** — the compiled extension lands in your demo project's `bin/`.
+6. **Put our `.dylib` where the extension can load it** (macOS: *inside* the `.framework`),
    and drop your config JSON into the project. Reuse the example's `.gdextension` (§5).
-8. **Reload the project**, write the GDScript from §6 in a node's `_ready()`, press Play.
+7. **Reload the project**, write the GDScript from §6 in a node's `_ready()`, press Play.
 
 **Sanity check after step 6:** in the Godot editor, type `EffectEngineGD` in a script. If
 autocomplete knows it, the extension loaded. If not, see Troubleshooting.

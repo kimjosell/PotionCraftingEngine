@@ -66,33 +66,8 @@ That's the entire vocabulary you need.
 
 ---
 
-## 3. Build the library (do this first, for any engine)
 
-Building the library produces exactly **two things** you'll copy into your game:
-
-1. **The library file** (the compiled code):
-   - Windows → `effect_engine_c.dll` (plus `effect_engine_c.lib` for linking)
-   - macOS → `libeffect_engine_c.dylib`
-   - Linux → `libeffect_engine_c.so`
-2. **The header file** (the list of functions you can call):
-   `include/effect_engine/effect_engine_c.h`
-
-To build them from the project:
-
-```bash
-cmake -S . -B build
-cmake --build build --target effect_engine_c
-```
-
-On macOS the build is **universal** (arm64 + x86_64) by default, so the `.dylib` links
-into universal engine builds on both Apple Silicon and Intel. To build for just your Mac:
-`cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=arm64`.
-
-The library has no other dependencies to ship — everything is baked in.
-
----
-
-## 4. The five rules of talking to the library
+## 3. The five rules of talking to the library
 
 The library speaks a deliberately simple language. Learn these five rules once and every
 engine's setup guide will make sense.
@@ -127,7 +102,7 @@ This is a normal outcome, not an error. Always check for it.
 
 ---
 
-## 5. A dry run (before touching any engine)
+## 4. A dry run (before touching any engine)
 
 Here's the whole flow in plain pseudocode, so you recognize it when you see it in your
 language of choice. (Remember: `chamomile`, `ginger`, `add` are example content.)
@@ -162,7 +137,7 @@ Every setup guide is just this dry run, dressed in that engine's clothing. Pick 
 
 ---
 
-## 6. When something goes wrong (any engine)
+## 5. When something goes wrong (any engine)
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -176,7 +151,7 @@ Every setup guide is just this dry run, dressed in that engine's clothing. Pick 
 
 ---
 
-## 7. Quick recap
+## 6. Quick recap
 
 1. Build the library, copy the **library file** + **header** into your game.
 2. **Load** the config once → you get an engine.

@@ -10,20 +10,18 @@ mental model, the five rules, the dry run) — this file is only the wiring.
 
 ## Quick Start
 
-1. **Build the library** (see the main guide's build section) to get
-   `effect_engine_c.dll` / `.dylib` / `.so`.
-2. **Drop the library into `Assets/Plugins/`** using the layout in §1. Click it in the
+1. **Drop the library into `Assets/Plugins/`** using the layout in §1. Click it in the
    Project window and, in the Inspector, tick the platforms it applies to (e.g. *Windows
    x86_64*, or *macOS*), then hit Apply.
-3. **Add `Native.cs`** — paste the `[DllImport]` declarations from §2 into a new script.
+2. **Add `Native.cs`** — paste the `[DllImport]` declarations from §2 into a new script.
    Make sure the `LIB` constant matches your file name (`"effect_engine_c"`).
-4. **Add the wrapper classes** from §3 (`Ingredient`, `Crafted`, `EffectEngine`) into a
+3. **Add the wrapper classes** from §3 (`Ingredient`, `Crafted`, `EffectEngine`) into a
    second script.
-5. **Put your config JSON in `Assets/StreamingAssets/`** so it ships with the build and is
+4. **Put your config JSON in `Assets/StreamingAssets/`** so it ships with the build and is
    readable at a real path at runtime.
-6. **Create a MonoBehaviour** with the `Start()` code from §4, and attach it to a
+5. **Create a MonoBehaviour** with the `Start()` code from §4, and attach it to a
    GameObject in your scene.
-7. **Press Play.** Check the Console — you'll see the brewed effect id or "dead zone".
+6. **Press Play.** Check the Console — you'll see the brewed effect id or "dead zone".
 
 If you get a `DllNotFoundException`, the plugin's platform settings (step 2) don't match
 your editor/build target, or the file name doesn't match `LIB` (step 3).
