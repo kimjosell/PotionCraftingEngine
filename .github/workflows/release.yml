@@ -51,6 +51,8 @@ jobs:
           mkdir dist
           cp "${{ matrix.lib }}" dist/
           cp -r include dist/
+          # Windows: ship the import library too — consumers link against the .lib, not the .dll.
+          if [ "${{ matrix.name }}" = "windows" ]; then cp build/Release/effect_engine_c.lib dist/; fi
 
       - uses: actions/upload-artifact@v4
         with:
