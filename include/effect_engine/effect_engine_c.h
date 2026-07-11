@@ -33,6 +33,19 @@ typedef struct EffectEngine EffectEngine; /* engine + loaded config */
 typedef struct EEIngredient EEIngredient; /* source or mysterious object */
 typedef struct EECrafted    EECrafted;    /* result of craft */
 
+/* A NON-OWNING view of one node in an ingredient's recipe tree. Valid only while the
+   EEIngredient / EECrafted it was obtained from is alive. NEVER free it. See the recipe
+   tree section below. */
+typedef struct EERecipeNode EERecipeNode;
+
+/* Kind of a recipe-tree node. A node models an ingredient in the tree:
+   a SOURCE leaf, or a MYSTERIOUS branch produced by a MIX (binary) or ALTER (unary). */
+typedef enum {
+    EE_NODE_SOURCE = 0, /* leaf: SourceObject — has id + tier + dimensions, 0 children     */
+    EE_NODE_MIX    = 1, /* branch: MixRecipe — operation_id + time, 2 children             */
+    EE_NODE_ALTER  = 2  /* branch: AlterRecipe — operation_id + alter_object_id, 1 child   */
+} EENodeKind;
+
 /* Reason for the most recent failed call on the current thread; "" if none. */
 EE_API const char* effect_engine_last_error(void);
 
@@ -71,6 +84,41 @@ EE_API int         effect_engine_crafted_dimensions(const EECrafted* crafted,
 EE_API int         effect_engine_crafted_active_domain_count(const EECrafted* crafted);
 EE_API const char* effect_engine_crafted_active_domain_id(const EECrafted* crafted, int index);
 EE_API float       effect_engine_crafted_active_domain_distance(const EECrafted* crafted, int index);
+
+/* ---- Recipe tree traversal (non-owning views) ----
+   Lets the caller walk the binary tree of how an object was built: which operation
+   produced it and, recursively, the ingredients that went in. Every returned node is a
+   view into the parent handle's tree and stays valid until that EEIngredient/EECrafted is
+   freed — do NOT free nodes, and do NOT keep them past the parent's lifetime. */
+
+/* Root node of the tree. For an ingredient this is the ingredient itself (a SOURCE leaf,
+   or a MYSTERIOUS branch). For a crafted object it is the mysterious object that was
+   crafted. Returns NULL on a null argument. */
+EE_API const EERecipeNode* effect_engine_ingredient_root(const EEIngredient* ingredient);
+EE_API const EERecipeNode* effect_engine_crafted_root(const EECrafted* crafted);
+
+/* Node kind (EENodeKind), or -1 on error. */
+EE_API int         effect_engine_node_kind(const EERecipeNode* node);
+/* Ingredient id at this node ("mysteriousObject" for a branch), or "" on error. */
+EE_API const char* effect_engine_node_id(const EERecipeNode* node);
+/* Tier — SOURCE nodes only; "" for branches or on error. */
+EE_API const char* effect_engine_node_tier(const EERecipeNode* node);
+/* Operation id — MIX/ALTER nodes only; "" for a SOURCE leaf or on error. */
+EE_API const char* effect_engine_node_operation_id(const EERecipeNode* node);
+/* Elapsed time — MIX nodes only; -1 otherwise. */
+EE_API int         effect_engine_node_time(const EERecipeNode* node);
+/* Alter object id — ALTER nodes only; "" otherwise. */
+EE_API const char* effect_engine_node_alter_object_id(const EERecipeNode* node);
+
+/* Dimensions of the ingredient at this node — same flat layout as
+   effect_engine_ingredient_dimensions (out[domain*3 + dim]). */
+EE_API int effect_engine_node_domain_count(const EERecipeNode* node);
+EE_API int effect_engine_node_dimensions(const EERecipeNode* node, int* out, int cap);
+
+/* Children (non-owning views). SOURCE: 0, ALTER: 1, MIX: 2. child() returns NULL if index
+   is out of range for this node's kind. */
+EE_API int                 effect_engine_node_child_count(const EERecipeNode* node);
+EE_API const EERecipeNode* effect_engine_node_child(const EERecipeNode* node, int index);
 
 /* ---- Alter object inspection ---- */
 /* Writes domain_count exponents into out. Returns count, or -1 on error/small buffer. */

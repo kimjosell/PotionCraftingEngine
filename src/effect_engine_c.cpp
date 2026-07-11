@@ -17,6 +17,11 @@ struct EECrafted {
     // Stable, index-addressable snapshot of the (unordered) active-domains map so that
     // the id/distance accessors agree across calls for the same index.
     std::vector<std::pair<std::string, float>> activeDomains;
+    // The mysterious object that was crafted, retained so the recipe tree can be walked
+    // from the crafted handle. craft() only keeps crafted.recipe (a Recipe), not the
+    // ingredient, so we hold the input's shared_ptr here — its dimensions equal the final
+    // effect coords (craft leaves them unchanged) and its recipe is the whole tree.
+    std::shared_ptr<Ingredient> rootIngredient;
 };
 
 namespace {
@@ -43,6 +48,22 @@ std::vector<int> flattenDimensions(const std::vector<DimensionTriple>& dims) {
     for (const auto& d : dims)
         for (std::size_t i = 0; i < kDimensionsPerDomain; ++i) flat.push_back(d[i]);
     return flat;
+}
+
+// A recipe-tree node is just a non-owning view of an Ingredient living inside a handle's
+// tree. EERecipeNode stays an incomplete type across the ABI; these reinterpret between the
+// opaque view and the real Ingredient (same address, no allocation, no ownership).
+const EERecipeNode* asNode(const Ingredient* ing) {
+    return reinterpret_cast<const EERecipeNode*>(ing);
+}
+const Ingredient* asIngredient(const EERecipeNode* node) {
+    return reinterpret_cast<const Ingredient*>(node);
+}
+
+// The Recipe carried by a mysterious node (null for a source leaf).
+const Recipe* nodeRecipe(const EERecipeNode* node) {
+    const auto* myst = dynamic_cast<const MysteriousObject*>(asIngredient(node));
+    return myst ? myst->recipe.get() : nullptr;
 }
 
 } // namespace
@@ -128,6 +149,7 @@ EECrafted* effect_engine_craft(EffectEngine* engine, const EEIngredient* mysteri
     try {
         auto* handle = new EECrafted{};
         handle->crafted = engine->engine.craft(*myst);
+        handle->rootIngredient = mysterious->obj; // retain for recipe-tree traversal
         for (const auto& kv : handle->crafted.effect.activeDomains)
             handle->activeDomains.emplace_back(kv.first, kv.second);
         return handle;
@@ -168,6 +190,101 @@ float effect_engine_crafted_active_domain_distance(const EECrafted* crafted, int
         setError("active domain index out of range"); return -1.0f;
     }
     return crafted->activeDomains[index].second;
+}
+
+// ---- Recipe tree traversal ----
+
+const EERecipeNode* effect_engine_ingredient_root(const EEIngredient* ingredient) {
+    clearError();
+    if (!ingredient) { setError("null ingredient"); return nullptr; }
+    return asNode(ingredient->obj.get());
+}
+
+const EERecipeNode* effect_engine_crafted_root(const EECrafted* crafted) {
+    clearError();
+    if (!crafted) { setError("null crafted"); return nullptr; }
+    return asNode(crafted->rootIngredient.get());
+}
+
+int effect_engine_node_kind(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return -1; }
+    if (dynamic_cast<const SourceObject*>(asIngredient(node))) return EE_NODE_SOURCE;
+    const Recipe* recipe = nodeRecipe(node);
+    if (!recipe) { setError("node has no recipe"); return -1; }
+    if (dynamic_cast<const MixRecipe*>(recipe))   return EE_NODE_MIX;
+    if (dynamic_cast<const AlterRecipe*>(recipe)) return EE_NODE_ALTER;
+    setError("unknown recipe kind"); return -1;
+}
+
+const char* effect_engine_node_id(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return ""; }
+    return asIngredient(node)->id.c_str();
+}
+
+const char* effect_engine_node_tier(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return ""; }
+    const auto* src = dynamic_cast<const SourceObject*>(asIngredient(node));
+    return src ? src->tier.c_str() : "";
+}
+
+const char* effect_engine_node_operation_id(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return ""; }
+    const Recipe* recipe = nodeRecipe(node);
+    return recipe ? recipe->operationId.c_str() : "";
+}
+
+int effect_engine_node_time(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return -1; }
+    const auto* mix = dynamic_cast<const MixRecipe*>(nodeRecipe(node));
+    if (!mix) { setError("node is not a mix"); return -1; }
+    return mix->time;
+}
+
+const char* effect_engine_node_alter_object_id(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return ""; }
+    const auto* alter = dynamic_cast<const AlterRecipe*>(nodeRecipe(node));
+    return alter ? alter->alterObjectId.c_str() : "";
+}
+
+int effect_engine_node_domain_count(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return -1; }
+    return static_cast<int>(asIngredient(node)->dimensions.size());
+}
+
+int effect_engine_node_dimensions(const EERecipeNode* node, int* out, int cap) {
+    clearError();
+    if (!node) { setError("null node"); return -1; }
+    return copyInts(flattenDimensions(asIngredient(node)->dimensions), out, cap);
+}
+
+int effect_engine_node_child_count(const EERecipeNode* node) {
+    clearError();
+    if (!node) { setError("null node"); return -1; }
+    const Recipe* recipe = nodeRecipe(node);
+    if (!recipe) return 0;                                   // source leaf
+    if (dynamic_cast<const MixRecipe*>(recipe))   return 2;
+    if (dynamic_cast<const AlterRecipe*>(recipe)) return 1;
+    setError("unknown recipe kind"); return -1;
+}
+
+const EERecipeNode* effect_engine_node_child(const EERecipeNode* node, int index) {
+    clearError();
+    if (!node) { setError("null node"); return nullptr; }
+    const Recipe* recipe = nodeRecipe(node);
+    if (const auto* mix = dynamic_cast<const MixRecipe*>(recipe)) {
+        if (index == 0) return asNode(mix->ingredientA.get());
+        if (index == 1) return asNode(mix->ingredientB.get());
+    } else if (const auto* alter = dynamic_cast<const AlterRecipe*>(recipe)) {
+        if (index == 0) return asNode(alter->ingredient.get());
+    }
+    setError("child index out of range"); return nullptr;
 }
 
 // ---- Alter object inspection ----

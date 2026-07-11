@@ -41,6 +41,27 @@ int main(int argc, char* argv[]) {
     const int expected[6] = {4, 2, 3, 1, 5, 2};
     for (int i = 0; i < 6; ++i) assert(dims[i] == expected[i]);
 
+    // Recipe tree: brew = mix(chamomile, zero, "add"), zero = mix(chamomile, chamomile).
+    // So the root is a binary MIX with a SOURCE leaf and a nested MIX branch.
+    const EERecipeNode* root = effect_engine_ingredient_root(brew);
+    assert(root);
+    assert(effect_engine_node_kind(root) == EE_NODE_MIX);
+    assert(std::strcmp(effect_engine_node_operation_id(root), "add") == 0);
+    assert(effect_engine_node_child_count(root) == 2);
+    const EERecipeNode* left = effect_engine_node_child(root, 0);
+    const EERecipeNode* right = effect_engine_node_child(root, 1);
+    assert(effect_engine_node_kind(left) == EE_NODE_SOURCE);
+    assert(std::strcmp(effect_engine_node_id(left), "chamomile") == 0);
+    assert(std::strcmp(effect_engine_node_tier(left), "standard") == 0);
+    assert(effect_engine_node_kind(right) == EE_NODE_MIX);          // recursion
+    assert(effect_engine_node_child_count(right) == 2);
+    assert(effect_engine_node_kind(effect_engine_node_child(right, 0)) == EE_NODE_SOURCE);
+    // Leaf dimensions match chamomile standard [[4,2,3],[1,5,2]].
+    int leafDims[6] = {0};
+    assert(effect_engine_node_dimensions(left, leafDims, 6) == 6);
+    for (int i = 0; i < 6; ++i) assert(leafDims[i] == expected[i]);
+    std::cout << "recipe tree: mix(" << effect_engine_node_id(left) << ", mix(...))\n";
+
     // Craft it → calming_brew (leaf coord [4,2,3] is within calming_brew's radius).
     EECrafted* crafted = effect_engine_craft(engine, brew);
     assert(crafted);
@@ -50,6 +71,12 @@ int main(int argc, char* argv[]) {
     std::cout << "craft(brew) -> " << effect_engine_crafted_effect_id(crafted)
               << " (leaf distance " << effect_engine_crafted_active_domain_distance(crafted, 0)
               << ")\n";
+
+    // Crafted keeps the tree too: its root is the mysterious object that was crafted.
+    const EERecipeNode* craftedRoot = effect_engine_crafted_root(crafted);
+    assert(craftedRoot);
+    assert(effect_engine_node_kind(craftedRoot) == EE_NODE_MIX);
+    assert(effect_engine_node_child_count(craftedRoot) == 2);
 
     // Null-effect path: crafting the all-zeros object lands in a dead zone.
     EECrafted* nullCraft = effect_engine_craft(engine, zero);
