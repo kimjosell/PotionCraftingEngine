@@ -1,5 +1,11 @@
 # Build output
 /build/
 
+# Editor / tooling caches
+.cache/
+
+# graphify generated output
+graphify-out/
+
 # macOS
 .DS_Store
