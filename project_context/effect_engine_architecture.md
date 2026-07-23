@@ -464,8 +464,10 @@ CraftedObject crafted = effect_engine_craft(engine, mysterious, &error);
 
 const char* effect_id      = crafted.effect.effect_id;   // empty string == null effect (dead zone)
 const char* effect_type    = crafted.effect.effect_type;      // "pure" or "combined" ("" when null)
-// active_domains maps each participating domain id to the distance
-// from the crafted object's coordinate to that domain's effect anchor.
+// active_domains maps each participating domain id to the normalized distance
+// (in [0,1]) from the crafted object's coordinate to that domain's effect anchor:
+// 0 = on the anchor (strongest), 1 = on the capture boundary. Strength = 1 - value.
+// Already divided by capture_radius, so comparable across effects. See design paper §3.5.
 // Empty (n_active == 0) when the effect is null.
 const ActiveDomain* active_domains = crafted.effect.active_domains;
 size_t              n_active        = crafted.effect.n_active_domains;

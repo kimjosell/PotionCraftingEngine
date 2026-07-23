@@ -31,6 +31,14 @@ int modpow(int base, int exp, int m) {
     }
     return result;
 }
+
+// Normalizes a raw anchor distance into [0,1] against the effect's capture radius:
+// 0 = exactly on the anchor (strongest), 1 = on the capture boundary (weakest still
+// active). Strength is (1 - this). Radius <= 0 (degenerate anchor that captures only
+// its exact center) maps to 0. See effect_system_design.md §3.5.
+float normalizedDistance(float dist, float captureRadius) {
+    return captureRadius > 0.0f ? dist / captureRadius : 0.0f;
+}
 } // namespace
 
 void Engine::load(const std::string& configPath) {
@@ -121,11 +129,13 @@ CraftedObject Engine::craft(const MysteriousObject& mysteriousObject) const {
         effect.effectId = bestCombined->id;
         for (const AnchorConfig& a : bestCombined->anchors) {
             const std::size_t idx = domainIndex.at(a.domain);
-            effect.activeDomains[a.domain] = domainDistance(coords[idx], a.anchor);
+            effect.activeDomains[a.domain] =
+                normalizedDistance(domainDistance(coords[idx], a.anchor), a.captureRadius);
         }
     } else if (dominantPure) {
         effect.effectId = dominantPure->id;
-        effect.activeDomains[dominantPure->anchor.domain] = bestPureScore;
+        const AnchorConfig& pa = dominantPure->anchor;
+        effect.activeDomains[pa.domain] = normalizedDistance(bestPureScore, pa.captureRadius);
     }
 
     CraftedObject crafted{};

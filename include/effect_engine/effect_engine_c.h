@@ -83,6 +83,10 @@ EE_API int         effect_engine_crafted_dimensions(const EECrafted* crafted,
 /* Active domains: one entry per participating domain (0 for a null effect). */
 EE_API int         effect_engine_crafted_active_domain_count(const EECrafted* crafted);
 EE_API const char* effect_engine_crafted_active_domain_id(const EECrafted* crafted, int index);
+/* Normalized distance to the domain's anchor in [0,1]: 0 = on the anchor (strongest),
+   1 = on the capture boundary (weakest still active). Strength = 1 - value. Already
+   divided by the anchor's capture_radius, so it is comparable across effects with
+   different radii. Returns -1 on a bad index. See design paper §3.5. */
 EE_API float       effect_engine_crafted_active_domain_distance(const EECrafted* crafted, int index);
 
 /* ---- Recipe tree traversal (non-owning views) ----

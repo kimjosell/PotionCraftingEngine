@@ -175,15 +175,24 @@ Players are told **which domain a pure effect belongs to** and **which domains a
 
 ### 3.5 Active domains
 
-Alongside the dominant effect identity, every crafted object exposes a map of **active domains** — the domains that participate in the winning effect, each paired with the crafted object's distance from that effect's anchor in that domain.
+Alongside the dominant effect identity, every crafted object exposes a map of **active domains** — the domains that participate in the winning effect, each paired with the crafted object's **normalized distance** from that effect's anchor in that domain.
 
 ```
-active_domains: Map<domain_id, distance_to_anchor>
+active_domains: Map<domain_id, normalized_distance>   // in [0, 1]
 ```
 
-For a pure effect, the map contains exactly one entry: the domain the pure effect belongs to, with the distance from the crafted object's coordinate in that domain to the pure anchor. For a combined effect, the map contains one entry per participating domain, each with the distance to the corresponding combined anchor.
+The value is the raw Euclidean distance to the anchor **divided by that anchor's `capture_radius`**, which places it on a fixed `[0, 1]` scale regardless of how large or small the radius is:
 
-This is **structural feedback**, not a numeric score for ranking. The distances let the game decide how much to surface to the player (e.g., a "purity" indicator, a strength bar, or nothing at all). The engine does not interpret these values — they are raw geometric distances in the same units as `capture_radius`.
+- `0` — the coordinate sits exactly on the anchor. Strongest possible expression of the effect.
+- `1` — the coordinate sits on the capture boundary (`distance == capture_radius`). Weakest still-active expression; anything past this is a null effect and does not appear in the map at all.
+
+Strength is therefore `1 - normalized_distance` (1 at the anchor, 0 at the boundary).
+
+**Why normalized and not raw.** A raw distance is only comparable within a single anchor: a raw `3.0` means "at the edge" for a radius-3 effect but "halfway in" for a radius-6 effect. Normalizing against each effect's own `capture_radius` makes the value comparable across effects with different radii — `0.5` always means "halfway between the anchor and the boundary", so a strength bar reads consistently no matter which effect won. (A degenerate anchor with `capture_radius <= 0` captures only its exact center and reports `0`.)
+
+For a pure effect, the map contains exactly one entry: the domain the pure effect belongs to. For a combined effect, the map contains one entry per participating domain, each normalized against that domain's own combined anchor radius.
+
+This is **structural feedback** for presentation (a "purity" indicator, a strength bar, or nothing at all) — it is not the score used to pick the winning effect. Dominance is still decided internally on raw distances (§6–§8); the normalized value is only what the crafted object reports outward.
 
 ---
 

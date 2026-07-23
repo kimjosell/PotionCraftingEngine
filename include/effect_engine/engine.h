@@ -53,7 +53,9 @@ struct Effect {
     // activeDomains is empty. Otherwise effectId names the dominant pure/combined effect.
     std::string effectId;
     std::vector<DimensionTriple> dimensions;               // final crafted coordinates
-    std::unordered_map<std::string, float> activeDomains;  // domain_id -> distance to anchor
+    // domain_id -> normalized distance to anchor in [0,1]: 0 = on the anchor (strongest),
+    // 1 = on the capture boundary (weakest still active). Strength = 1 - value. See §3.5.
+    std::unordered_map<std::string, float> activeDomains;
 };
 
 struct CraftedObject {

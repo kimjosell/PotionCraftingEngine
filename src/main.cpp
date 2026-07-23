@@ -96,7 +96,8 @@ int main(int argc, char* argv[]) {
         assert(crafted.effect.activeDomains.count("leaf") == 1);
         std::cout << "craft(chamomile) -> effect: " << crafted.effect.effectId << "\n";
         for (const auto& [domainId, dist] : crafted.effect.activeDomains) {
-            std::cout << "  active domain " << domainId << ": distance " << dist << "\n";
+            std::cout << "  active domain " << domainId << ": normalized distance " << dist
+                      << " (strength " << (1.0f - dist) << ")\n";
         }
 
         // Self-check: an object at the origin is far from every anchor (leaf and root
@@ -133,7 +134,8 @@ int main(int argc, char* argv[]) {
         } else {
             std::cout << "craft(brew) -> effect: " << crafted.effect.effectId << "\n";
             for (const auto& [domainId, dist] : crafted.effect.activeDomains) {
-                std::cout << "  active domain " << domainId << ": distance " << dist << "\n";
+                std::cout << "  active domain " << domainId << ": normalized distance " << dist
+                          << " (strength " << (1.0f - dist) << ")\n";
             }
         }
     } catch (const EngineError& e) {
