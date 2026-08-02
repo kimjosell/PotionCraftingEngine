@@ -9,3 +9,5 @@ graphify-out/
 
 # macOS
 .DS_Store
+
+.vscode/
