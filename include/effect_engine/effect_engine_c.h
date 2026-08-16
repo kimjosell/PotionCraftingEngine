@@ -15,6 +15,7 @@
 #ifndef EFFECT_ENGINE_C_H
 #define EFFECT_ENGINE_C_H
 
+#include <cstddef>
 #if defined(_WIN32)
   #if defined(EFFECT_ENGINE_BUILD)
     #define EE_API __declspec(dllexport)
@@ -41,9 +42,10 @@ typedef struct EERecipeNode EERecipeNode;
 /* Kind of a recipe-tree node. A node models an ingredient in the tree:
    a SOURCE leaf, or a MYSTERIOUS branch produced by a MIX (binary) or ALTER (unary). */
 typedef enum {
-    EE_NODE_SOURCE = 0, /* leaf: SourceObject — has id + tier + dimensions, 0 children     */
-    EE_NODE_MIX    = 1, /* branch: MixRecipe — operation_id + time, 2 children             */
-    EE_NODE_ALTER  = 2  /* branch: AlterRecipe — operation_id + alter_object_id, 1 child   */
+    EE_NODE_SOURCE    = 0, /* leaf: SourceObject — has id + tier + dimensions, 0 children     */
+    EE_NODE_MIX       = 1, /* branch: MixRecipe — operation_id + time, N children             */
+    EE_NODE_ALTER     = 2, /* branch: AlterRecipe — operation_id + alter_object_id, 1 child   */
+    EE_NODE_SUBTRACT = 3  /* branch: subtractRecipe — operation_id + time, 2 children (base, tosubtract) */
 } EENodeKind;
 
 /* Reason for the most recent failed call on the current thread; "" if none. */
@@ -57,8 +59,12 @@ EE_API void          effect_engine_destroy(EffectEngine* engine);
 EE_API EEIngredient* effect_engine_get_source(EffectEngine* engine,
                                               const char* source_id, const char* tier);
 EE_API EEIngredient* effect_engine_mix(EffectEngine* engine,
-                                       const EEIngredient* a, const EEIngredient* b,
-                                       const char* operation_id, int elapsed_time);
+                                const EEIngredient* const* ingredients,
+                                size_t count,
+                                const char* operation_id, int elapsed_time);
+
+EE_API EEIngredient* effect_engine_subtract(EffectEngine* engine, const EEIngredient* a, const EEIngredient* b, int elapsed_time);
+
 EE_API EEIngredient* effect_engine_alter(EffectEngine* engine,
                                          const EEIngredient* target,
                                          const char* alter_object_id);

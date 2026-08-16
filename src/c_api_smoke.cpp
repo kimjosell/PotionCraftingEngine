@@ -26,12 +26,14 @@ int main(int argc, char* argv[]) {
     std::cout << "\n";
 
     // Build a mysterious object equal to chamomile's coordinates using only the C API:
-    //   zero  = chamomile - chamomile  (all zeros)
+    //   zero  = chamomile - chamomile  (all zeros, via the dedicated subtract function)
     //   brew  = chamomile + zero       (mysterious object carrying chamomile's dims)
     EEIngredient* chamomile = effect_engine_get_source(engine, "chamomile", "standard");
     assert(chamomile);
-    EEIngredient* zero = effect_engine_mix(engine, chamomile, chamomile, "subtract", 0);
-    EEIngredient* brew = effect_engine_mix(engine, chamomile, zero, "add", 0);
+    EEIngredient* zero = effect_engine_subtract(engine, chamomile, chamomile, 0);
+    assert(zero);
+    const EEIngredient* addArgs[] = {chamomile, zero};
+    EEIngredient* brew = effect_engine_mix(engine, addArgs, 2, "add", 0);
     assert(brew);
 
     int dims[6] = {0};
@@ -41,8 +43,8 @@ int main(int argc, char* argv[]) {
     const int expected[6] = {4, 2, 3, 1, 5, 2};
     for (int i = 0; i < 6; ++i) assert(dims[i] == expected[i]);
 
-    // Recipe tree: brew = mix(chamomile, zero, "add"), zero = mix(chamomile, chamomile).
-    // So the root is a binary MIX with a SOURCE leaf and a nested MIX branch.
+    // Recipe tree: brew = mix(chamomile, zero, "add"), zero = subtract(chamomile, chamomile).
+    // So the root is a MIX with a SOURCE leaf and a nested subtract branch.
     const EERecipeNode* root = effect_engine_ingredient_root(brew);
     assert(root);
     assert(effect_engine_node_kind(root) == EE_NODE_MIX);
@@ -53,14 +55,15 @@ int main(int argc, char* argv[]) {
     assert(effect_engine_node_kind(left) == EE_NODE_SOURCE);
     assert(std::strcmp(effect_engine_node_id(left), "chamomile") == 0);
     assert(std::strcmp(effect_engine_node_tier(left), "standard") == 0);
-    assert(effect_engine_node_kind(right) == EE_NODE_MIX);          // recursion
+    assert(effect_engine_node_kind(right) == EE_NODE_SUBTRACT);    // recursion
+    assert(std::strcmp(effect_engine_node_operation_id(right), "subtract") == 0);
     assert(effect_engine_node_child_count(right) == 2);
     assert(effect_engine_node_kind(effect_engine_node_child(right, 0)) == EE_NODE_SOURCE);
     // Leaf dimensions match chamomile standard [[4,2,3],[1,5,2]].
     int leafDims[6] = {0};
     assert(effect_engine_node_dimensions(left, leafDims, 6) == 6);
     for (int i = 0; i < 6; ++i) assert(leafDims[i] == expected[i]);
-    std::cout << "recipe tree: mix(" << effect_engine_node_id(left) << ", mix(...))\n";
+    std::cout << "recipe tree: mix(" << effect_engine_node_id(left) << ", subtract(...))\n";
 
     // Craft it → calming_brew (leaf coord [4,2,3] is within calming_brew's radius).
     EECrafted* crafted = effect_engine_craft(engine, brew);
@@ -86,7 +89,8 @@ int main(int argc, char* argv[]) {
     std::cout << "craft(zero) -> null effect\n";
 
     // Error path: an unknown operation returns NULL and sets last_error.
-    EEIngredient* bad = effect_engine_mix(engine, chamomile, zero, "divide", 0);
+    const EEIngredient* badArgs[] = {chamomile, zero};
+    EEIngredient* bad = effect_engine_mix(engine, badArgs, 2, "divide", 0);
     assert(bad == nullptr);
     assert(effect_engine_last_error()[0] != '\0');
     std::cout << "mix(divide) rejected: " << effect_engine_last_error() << "\n";

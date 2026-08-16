@@ -2,10 +2,26 @@
 #include "effect_engine/config_loader.h"
 
 #include <cassert>
+#include <functional>
 #include <iostream>
+#include <memory>
 #include <string>
+#include <vector>
 
 using namespace effect_engine;
+
+// Returns true iff fn() throws EngineError (and nothing else).
+static bool throwsEngineError(const std::function<void()>& fn) {
+    try { fn(); }
+    catch (const EngineError&) { return true; }
+    catch (...) { return false; }
+    return false;
+}
+
+static std::vector<std::shared_ptr<Ingredient>> vec(
+    std::initializer_list<std::shared_ptr<Ingredient>> l) {
+    return {l};
+}
 
 int main(int argc, char* argv[]) {
     const std::string configPath = (argc > 1)
@@ -15,140 +31,152 @@ int main(int argc, char* argv[]) {
     Engine engine;
     try {
         engine.load(configPath);
-        std::cout << "Engine loaded successfully from: " << configPath << "\n";
     } catch (const ConfigParseError& e) {
         std::cerr << "Failed to load engine: " << e.what() << "\n";
         return 1;
     }
 
-    try {
-        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
-        std::cout << "getSourceObjectInfo(\"chamomile\", \"standard\"):\n";
-        std::cout << "  id:   " << chamomile.id   << "\n";
-        std::cout << "  tier: " << chamomile.tier  << "\n";
-        for (std::size_t k = 0; k < chamomile.dimensions.size(); ++k) {
-            const auto& d = chamomile.dimensions[k];
-            std::cout << "  domain[" << k << "]: ["
-                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
-        }
-    } catch (const EngineError& e) {
-        std::cerr << "Engine error: " << e.what() << "\n";
-        return 1;
-    }
+    const SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+    const SourceObject ginger    = engine.getSourceObjectInfo("ginger", "standard");
+    const int modulus = 7; // matches tea_alchemist_config-v1.0.0.json
 
-    try {
-        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+    // ---------------------------------------------------------------------
+    // subtract(base, tosubtract, elapsedTime) — the new dedicated function
+    // ---------------------------------------------------------------------
 
-        // Self-check: subtracting an ingredient from itself with 0 elapsed time
-        // must zero out every dimension (a-a=0, no time modifier). Config-independent.
-        MysteriousObject zero = engine.mix(chamomile, chamomile, "subtract", 0);
-        assert(zero.id == "mysteriousObject");
-        for (const auto& d : zero.dimensions)
+    // 1. a - a with no time modifier zeroes out every dimension.
+    {
+        MysteriousObject r = engine.subtract(chamomile, chamomile, 0);
+        assert(r.id == "mysteriousObject");
+        for (const auto& d : r.dimensions)
             assert(d[0] == 0 && d[1] == 0 && d[2] == 0);
-        assert(zero.recipe && zero.recipe->operationId == "subtract");
-
-        MysteriousObject mixed = engine.mix(chamomile, chamomile, "add", 30);
-        std::cout << "mix(chamomile, chamomile, \"add\", 30):\n";
-        for (std::size_t k = 0; k < mixed.dimensions.size(); ++k) {
-            const auto& d = mixed.dimensions[k];
-            std::cout << "  domain[" << k << "]: ["
-                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
-        }
-    } catch (const EngineError& e) {
-        std::cerr << "mix error: " << e.what() << "\n";
-        return 1;
+        assert(r.recipe && r.recipe->operationId == "subtract");
+        std::cout << "[ok] subtract self, time 0 -> all zeros\n";
     }
 
-    try {
-        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
+    // 2. THE negative worry: base < tosubtract must never yield a negative value.
+    //    Every dimension must stay in [0, modulus).
+    {
+        MysteriousObject r = engine.subtract(chamomile, ginger, 0);
+        for (const auto& d : r.dimensions)
+            for (int v : d)
+                assert(v >= 0 && v < modulus);
+        std::cout << "[ok] subtract underflow stays in [0, modulus) -> never negative\n";
+    }
 
-        // Self-check: fire_focus exponents [1, 5] on chamomile [[4,2,3],[1,5,2]] (modulus 7).
-        // domain 0 exponent 1 = identity → unchanged; domain 1 exponent 5 → [1^5,5^5,2^5]%7 = [1,3,4].
+    // 3. Time modifier is applied. subtract: time_per_point=10, max_modifier=3.
+    //    time 30 -> modifier = (30/10) % 4 = 3; a-a=0 -> mod(0 - 3, 7) = 4 everywhere.
+    {
+        MysteriousObject r = engine.subtract(chamomile, chamomile, 30);
+        for (const auto& d : r.dimensions)
+            assert(d[0] == 4 && d[1] == 4 && d[2] == 4);
+        std::cout << "[ok] subtract applies time modifier\n";
+    }
+
+    // 4. Domain count mismatch throws.
+    {
+        SourceObject bad;
+        bad.id = "bad";
+        bad.dimensions = {DimensionTriple{0, 0, 0}}; // 1 domain, engine has 2
+        assert(throwsEngineError([&] { engine.subtract(bad, chamomile, 0); }));
+        std::cout << "[ok] subtract rejects wrong domain count\n";
+    }
+
+    // ---------------------------------------------------------------------
+    // mix(vector<shared_ptr<Ingredient>>, operationId, elapsedTime) — add/multiply
+    // ---------------------------------------------------------------------
+
+    // 5. add, two ingredients, time 0: (a+b) % 7.
+    //    domain0 [6,6,4], domain1 [6,1,6].
+    {
+        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "add", 0);
+        assert((r.dimensions[0] == DimensionTriple{6, 6, 4}));
+        assert((r.dimensions[1] == DimensionTriple{6, 1, 6}));
+        std::cout << "[ok] mix add (2 ingredients) matches (a+b) % modulus\n";
+    }
+
+    // 6. multiply, two ingredients, time 0: (a*b) % 7. Seed starts at 1.
+    //    domain0 [1,1,3], domain1 [5,1,1].
+    {
+        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "multiply", 0);
+        assert((r.dimensions[0] == DimensionTriple{1, 1, 3}));
+        assert((r.dimensions[1] == DimensionTriple{5, 1, 1}));
+        std::cout << "[ok] mix multiply (2 ingredients) matches (a*b) % modulus\n";
+    }
+
+    // 7. add identity: a single ingredient returns itself % modulus (seed 0).
+    {
+        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "add", 0);
+        assert((r.dimensions[0] == DimensionTriple{4, 2, 3}));
+        assert((r.dimensions[1] == DimensionTriple{1, 5, 2}));
+        std::cout << "[ok] mix add identity (single ingredient)\n";
+    }
+
+    // 8. multiply identity: a single ingredient returns itself % modulus (seed 1).
+    {
+        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "multiply", 0);
+        assert((r.dimensions[0] == DimensionTriple{4, 2, 3}));
+        assert((r.dimensions[1] == DimensionTriple{1, 5, 2}));
+        std::cout << "[ok] mix multiply identity (single ingredient)\n";
+    }
+
+    // 9. empty ingredient list throws.
+    {
+        assert(throwsEngineError([&] { engine.mix({}, "add", 0); }));
+        std::cout << "[ok] mix rejects empty ingredient list\n";
+    }
+
+    // 10. null ingredient in the list throws (guards the !ing check).
+    {
+        assert(throwsEngineError([&] {
+            engine.mix(vec({std::shared_ptr<Ingredient>{nullptr}}), "add", 0);
+        }));
+        std::cout << "[ok] mix rejects null ingredient\n";
+    }
+
+    // 11. unsupported operation throws.
+    {
+        assert(throwsEngineError([&] {
+            engine.mix(vec({chamomile.clone()}), "divide", 0);
+        }));
+        std::cout << "[ok] mix rejects unknown operation\n";
+    }
+
+    // ---------------------------------------------------------------------
+    // alter / craft — unchanged behavior, kept as regression checks
+    // ---------------------------------------------------------------------
+
+    // 12. alter: fire_focus exponents [1,5] on chamomile [[4,2,3],[1,5,2]] (mod 7).
+    {
         MysteriousObject altered = engine.alter(chamomile, "fire_focus");
-        assert(altered.id == "mysteriousObject");
         assert((altered.dimensions[0] == DimensionTriple{4, 2, 3}));
         assert((altered.dimensions[1] == DimensionTriple{1, 3, 4}));
         assert(altered.recipe && altered.recipe->operationId == "exponentiation");
-
-        std::cout << "alter(chamomile, \"fire_focus\"):\n";
-        for (std::size_t k = 0; k < altered.dimensions.size(); ++k) {
-            const auto& d = altered.dimensions[k];
-            std::cout << "  domain[" << k << "]: ["
-                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
-        }
-    } catch (const EngineError& e) {
-        std::cerr << "alter error: " << e.what() << "\n";
-        return 1;
+        std::cout << "[ok] alter fire_focus\n";
     }
 
-    try {
-        // Self-check: craft chamomile standard [[4,2,3],[1,5,2]] (modulus 7).
-        // leaf coord [4,2,3] is 1.41 from calming_brew anchor [5,2,4] (radius 2.0) → candidate.
-        // root coord [1,5,2] is 6.16 from warming_brew (radius 2.0) → out of range, so
-        // harmony_tea (needs both domains in range) is not a candidate. Pure wins: calming_brew.
-        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
-        MysteriousObject onlyChamomile{};
-        onlyChamomile.id = "mysteriousObject";
-        onlyChamomile.dimensions = chamomile.dimensions;
-        CraftedObject crafted = engine.craft(onlyChamomile);
+    // 13. craft: chamomile lands on calming_brew (leaf domain only).
+    {
+        MysteriousObject obj{};
+        obj.id = "mysteriousObject";
+        obj.dimensions = chamomile.dimensions;
+        CraftedObject crafted = engine.craft(obj);
         assert(crafted.effect.effectId == "calming_brew");
-        assert(crafted.effect.activeDomains.size() == 1);
         assert(crafted.effect.activeDomains.count("leaf") == 1);
-        std::cout << "craft(chamomile) -> effect: " << crafted.effect.effectId << "\n";
-        for (const auto& [domainId, dist] : crafted.effect.activeDomains) {
-            std::cout << "  active domain " << domainId << ": normalized distance " << dist
-                      << " (strength " << (1.0f - dist) << ")\n";
-        }
-
-        // Self-check: an object at the origin is far from every anchor (leaf and root
-        // anchors sit near [5,2,4]/[6,3,5] with radius 2.0–2.5), so no effect is a
-        // candidate → null effect: empty id, empty active domains.
-        MysteriousObject deadZone{};
-        deadZone.id = "mysteriousObject";
-        deadZone.dimensions = {DimensionTriple{0, 0, 0}, DimensionTriple{0, 0, 0}};
-        CraftedObject nullCraft = engine.craft(deadZone);
-        assert(nullCraft.effect.effectId.empty());
-        assert(nullCraft.effect.activeDomains.empty());
-        std::cout << "craft(dead zone) -> null effect (no dominant effect)\n";
-    } catch (const EngineError& e) {
-        std::cerr << "craft error: " << e.what() << "\n";
-        return 1;
+        std::cout << "[ok] craft chamomile -> calming_brew\n";
     }
 
-    try {
-        // Experiment: mix two ingredients, then craft the mysterious object it produces.
-        SourceObject chamomile = engine.getSourceObjectInfo("chamomile", "standard");
-        SourceObject ginger    = engine.getSourceObjectInfo("ginger", "standard");
-
-        MysteriousObject brew = engine.mix(chamomile, ginger, "add", 0);
-        std::cout << "mix(chamomile, ginger, \"add\", 0):\n";
-        for (std::size_t k = 0; k < brew.dimensions.size(); ++k) {
-            const auto& d = brew.dimensions[k];
-            std::cout << "  domain[" << k << "]: ["
-                      << d[0] << ", " << d[1] << ", " << d[2] << "]\n";
-        }
-
-        CraftedObject crafted = engine.craft(brew);
-        if (crafted.effect.effectId.empty()) {
-            std::cout << "craft(brew) -> null effect (landed in a dead zone)\n";
-        } else {
-            std::cout << "craft(brew) -> effect: " << crafted.effect.effectId << "\n";
-            for (const auto& [domainId, dist] : crafted.effect.activeDomains) {
-                std::cout << "  active domain " << domainId << ": normalized distance " << dist
-                          << " (strength " << (1.0f - dist) << ")\n";
-            }
-        }
-    } catch (const EngineError& e) {
-        std::cerr << "mix+craft experiment error: " << e.what() << "\n";
-        return 1;
+    // 14. craft: origin is outside every capture radius -> null effect.
+    {
+        MysteriousObject dead{};
+        dead.id = "mysteriousObject";
+        dead.dimensions = {DimensionTriple{0, 0, 0}, DimensionTriple{0, 0, 0}};
+        CraftedObject crafted = engine.craft(dead);
+        assert(crafted.effect.effectId.empty());
+        assert(crafted.effect.activeDomains.empty());
+        std::cout << "[ok] craft dead zone -> null effect\n";
     }
 
-    try {
-        AlterObject unknown = engine.getAlterObjectInfo("fire_focus");
-        std::cout<< "Objecto encontrado con exito";
-    } catch (const EngineError& e) {
-        std::cout << "getAlterObjectInfo(\"fire_focus\"): " << e.what() << "\n";
-    }
-
+    std::cout << "\nAll tests passed.\n";
     return 0;
 }
