@@ -145,11 +145,7 @@ CraftedObject Engine::craft(const MysteriousObject& mysteriousObject) const {
     return crafted;
 }
 
-MysteriousObject Engine::subtract(const Ingredient& baseIngredient, const Ingredient& ingredientToSubtract, int elapsedTime) const {
-    auto opIt = engineConfig_.operations.find("subtract");
-    if (opIt == engineConfig_.operations.end()){
-            throw EngineError("unknown mix operation: subtract");
-    }
+MysteriousObject Engine::subtract(const Ingredient& baseIngredient, const Ingredient& ingredientToSubtract) const {
 
     const std::size_t domainCount = engineConfig_.domains.size();
     if (baseIngredient.dimensions.size() != domainCount ||
@@ -158,13 +154,6 @@ MysteriousObject Engine::subtract(const Ingredient& baseIngredient, const Ingred
     }
 
     const int modulus = engineConfig_.modulus;
-    const OperationConfig& op = opIt->second;
-
-    // step 2: time modifier — uniform across every dimension of every domain.
-    // ponytail: guard time_per_point==0 (config loader doesn't enforce >0) → no division by zero.
-    const int modifier = op.timePerPoint > 0
-        ? mod(elapsedTime / op.timePerPoint, op.maxModifier + 1)
-        : 0;
 
     MysteriousObject result{};
     result.id = "mysteriousObject";
@@ -175,13 +164,12 @@ MysteriousObject Engine::subtract(const Ingredient& baseIngredient, const Ingred
             const int b = ingredientToSubtract.dimensions[k][i];
             int raw = a - b;
             // step 1: arithmetic % mod  →  step 3: (raw + modifier) % mod
-            result.dimensions[k][i] = mod(mod(raw, modulus) - modifier, modulus);
+            result.dimensions[k][i] = mod(raw, modulus);
         }
     }
 
     auto recipe = std::make_shared<SubtractRecipe>();
     recipe->operationId = "subtract";
-    recipe->time        = elapsedTime;
     recipe->baseIngredient = baseIngredient.clone();
     recipe->ingredientToSubtract = ingredientToSubtract.clone();
     result.recipe = recipe;
@@ -189,14 +177,9 @@ MysteriousObject Engine::subtract(const Ingredient& baseIngredient, const Ingred
 }
 
 MysteriousObject Engine::mix(const std::vector<std::shared_ptr<Ingredient>>& ingredients,
-                             const std::string& operationId, int elapsedTime) const {
+                             const std::string& operationId) const {
     if (ingredients.empty()){
         throw EngineError("mix operation requires at least one ingredient");
-    }
-
-    auto opIt = engineConfig_.operations.find(operationId);
-    if (opIt == engineConfig_.operations.end()) {
-        throw EngineError("unknown mix operation: " + operationId);
     }
 
     const std::size_t domainCount = engineConfig_.domains.size();
@@ -207,13 +190,6 @@ MysteriousObject Engine::mix(const std::vector<std::shared_ptr<Ingredient>>& ing
     }
 
     const int modulus = engineConfig_.modulus;
-    const OperationConfig& op = opIt->second;
-
-    // step 2: time modifier — uniform across every dimension of every domain.
-    // ponytail: guard time_per_point==0 (config loader doesn't enforce >0) → no division by zero.
-    const int modifier = op.timePerPoint > 0
-        ? mod(elapsedTime / op.timePerPoint, op.maxModifier + 1)
-        : 0;
 
     MysteriousObject result{};
     result.id = "mysteriousObject";
@@ -233,14 +209,12 @@ MysteriousObject Engine::mix(const std::vector<std::shared_ptr<Ingredient>>& ing
                 }
                 else throw EngineError("unsupported mix operation" + operationId);
             }
-            // step 1: arithmetic % mod  →  step 3: (raw + modifier) % mod
-            result.dimensions[k][i] = mod(raw + modifier, modulus);
+            result.dimensions[k][i] = mod(raw, modulus);
         }
     }
 
     auto recipe = std::make_shared<MixRecipe>();
     recipe->operationId = operationId;
-    recipe->time        = elapsedTime;
     recipe->ingredients.reserve(ingredients.size());
     for(const auto& ing : ingredients) {
         recipe->ingredients.push_back(ing->clone());

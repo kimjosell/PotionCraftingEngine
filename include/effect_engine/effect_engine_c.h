@@ -61,9 +61,9 @@ EE_API EEIngredient* effect_engine_get_source(EffectEngine* engine,
 EE_API EEIngredient* effect_engine_mix(EffectEngine* engine,
                                 const EEIngredient* const* ingredients,
                                 size_t count,
-                                const char* operation_id, int elapsed_time);
+                                const char* operation_id);
 
-EE_API EEIngredient* effect_engine_subtract(EffectEngine* engine, const EEIngredient* a, const EEIngredient* b, int elapsed_time);
+EE_API EEIngredient* effect_engine_subtract(EffectEngine* engine, const EEIngredient* a, const EEIngredient* b);
 
 EE_API EEIngredient* effect_engine_alter(EffectEngine* engine,
                                          const EEIngredient* target,
@@ -115,8 +115,6 @@ EE_API const char* effect_engine_node_id(const EERecipeNode* node);
 EE_API const char* effect_engine_node_tier(const EERecipeNode* node);
 /* Operation id — MIX/ALTER nodes only; "" for a SOURCE leaf or on error. */
 EE_API const char* effect_engine_node_operation_id(const EERecipeNode* node);
-/* Elapsed time — MIX nodes only; -1 otherwise. */
-EE_API int         effect_engine_node_time(const EERecipeNode* node);
 /* Alter object id — ALTER nodes only; "" otherwise. */
 EE_API const char* effect_engine_node_alter_object_id(const EERecipeNode* node);
 

@@ -71,7 +71,6 @@ struct Recipe {
 };
 
 struct MixRecipe : Recipe {
-    int time = 0; // elapsed time units passed to the mix operation
     std::vector<std::shared_ptr<Ingredient>> ingredients;
 };
 
@@ -81,7 +80,6 @@ struct AlterRecipe : Recipe {
 };
 
 struct SubtractRecipe : Recipe {
-    int time = 0;
     std::shared_ptr<Ingredient> baseIngredient;
     std::shared_ptr<Ingredient> ingredientToSubtract;
 };
@@ -101,8 +99,8 @@ public:
 
     CraftedObject    craft(const MysteriousObject& mysteriousObject) const;
     MysteriousObject mix(const std::vector<std::shared_ptr<Ingredient>>& ingredients,
-                         const std::string& operationId, int elapsedTime) const;
-    MysteriousObject subtract(const Ingredient& baseIngredient, const Ingredient& ingredientToSubtract, int elapsedTime) const;
+                         const std::string& operationId) const;
+    MysteriousObject subtract(const Ingredient& baseIngredient, const Ingredient& ingredientToSubtract) const;
     MysteriousObject alter(const Ingredient& ingredient,
                            const std::string& alterObjectId) const;
 

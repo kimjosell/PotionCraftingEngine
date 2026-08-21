@@ -30,10 +30,10 @@ int main(int argc, char* argv[]) {
     //   brew  = chamomile + zero       (mysterious object carrying chamomile's dims)
     EEIngredient* chamomile = effect_engine_get_source(engine, "chamomile", "standard");
     assert(chamomile);
-    EEIngredient* zero = effect_engine_subtract(engine, chamomile, chamomile, 0);
+    EEIngredient* zero = effect_engine_subtract(engine, chamomile, chamomile);
     assert(zero);
     const EEIngredient* addArgs[] = {chamomile, zero};
-    EEIngredient* brew = effect_engine_mix(engine, addArgs, 2, "add", 0);
+    EEIngredient* brew = effect_engine_mix(engine, addArgs, 2, "add");
     assert(brew);
 
     int dims[6] = {0};
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
 
     // Error path: an unknown operation returns NULL and sets last_error.
     const EEIngredient* badArgs[] = {chamomile, zero};
-    EEIngredient* bad = effect_engine_mix(engine, badArgs, 2, "divide", 0);
+    EEIngredient* bad = effect_engine_mix(engine, badArgs, 2, "divide");
     assert(bad == nullptr);
     assert(effect_engine_last_error()[0] != '\0');
     std::cout << "mix(divide) rejected: " << effect_engine_last_error() << "\n";

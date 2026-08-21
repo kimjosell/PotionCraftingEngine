@@ -40,13 +40,10 @@ int main(int argc, char* argv[]) {
     const SourceObject ginger    = engine.getSourceObjectInfo("ginger", "standard");
     const int modulus = 7; // matches tea_alchemist_config-v1.0.0.json
 
-    // ---------------------------------------------------------------------
-    // subtract(base, tosubtract, elapsedTime) — the new dedicated function
-    // ---------------------------------------------------------------------
 
-    // 1. a - a with no time modifier zeroes out every dimension.
+    // 1. a -  zeroes out every dimension.
     {
-        MysteriousObject r = engine.subtract(chamomile, chamomile, 0);
+        MysteriousObject r = engine.subtract(chamomile, chamomile);
         assert(r.id == "mysteriousObject");
         for (const auto& d : r.dimensions)
             assert(d[0] == 0 && d[1] == 0 && d[2] == 0);
@@ -57,28 +54,19 @@ int main(int argc, char* argv[]) {
     // 2. THE negative worry: base < tosubtract must never yield a negative value.
     //    Every dimension must stay in [0, modulus).
     {
-        MysteriousObject r = engine.subtract(chamomile, ginger, 0);
+        MysteriousObject r = engine.subtract(chamomile, ginger);
         for (const auto& d : r.dimensions)
             for (int v : d)
                 assert(v >= 0 && v < modulus);
         std::cout << "[ok] subtract underflow stays in [0, modulus) -> never negative\n";
     }
 
-    // 3. Time modifier is applied. subtract: time_per_point=10, max_modifier=3.
-    //    time 30 -> modifier = (30/10) % 4 = 3; a-a=0 -> mod(0 - 3, 7) = 4 everywhere.
-    {
-        MysteriousObject r = engine.subtract(chamomile, chamomile, 30);
-        for (const auto& d : r.dimensions)
-            assert(d[0] == 4 && d[1] == 4 && d[2] == 4);
-        std::cout << "[ok] subtract applies time modifier\n";
-    }
-
-    // 4. Domain count mismatch throws.
+    // 3. Domain count mismatch throws.
     {
         SourceObject bad;
         bad.id = "bad";
         bad.dimensions = {DimensionTriple{0, 0, 0}}; // 1 domain, engine has 2
-        assert(throwsEngineError([&] { engine.subtract(bad, chamomile, 0); }));
+        assert(throwsEngineError([&] { engine.subtract(bad, chamomile); }));
         std::cout << "[ok] subtract rejects wrong domain count\n";
     }
 
@@ -89,16 +77,16 @@ int main(int argc, char* argv[]) {
     // 5. add, two ingredients, time 0: (a+b) % 7.
     //    domain0 [6,6,4], domain1 [6,1,6].
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "add", 0);
+        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "add");
         assert((r.dimensions[0] == DimensionTriple{6, 6, 4}));
         assert((r.dimensions[1] == DimensionTriple{6, 1, 6}));
         std::cout << "[ok] mix add (2 ingredients) matches (a+b) % modulus\n";
     }
 
-    // 6. multiply, two ingredients, time 0: (a*b) % 7. Seed starts at 1.
+    // 6. multiply, two ingredients, (a*b) % 7. Seed starts at 1.
     //    domain0 [1,1,3], domain1 [5,1,1].
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "multiply", 0);
+        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "multiply");
         assert((r.dimensions[0] == DimensionTriple{1, 1, 3}));
         assert((r.dimensions[1] == DimensionTriple{5, 1, 1}));
         std::cout << "[ok] mix multiply (2 ingredients) matches (a*b) % modulus\n";
@@ -106,7 +94,7 @@ int main(int argc, char* argv[]) {
 
     // 7. add identity: a single ingredient returns itself % modulus (seed 0).
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "add", 0);
+        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "add");
         assert((r.dimensions[0] == DimensionTriple{4, 2, 3}));
         assert((r.dimensions[1] == DimensionTriple{1, 5, 2}));
         std::cout << "[ok] mix add identity (single ingredient)\n";
@@ -114,7 +102,7 @@ int main(int argc, char* argv[]) {
 
     // 8. multiply identity: a single ingredient returns itself % modulus (seed 1).
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "multiply", 0);
+        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "multiply");
         assert((r.dimensions[0] == DimensionTriple{4, 2, 3}));
         assert((r.dimensions[1] == DimensionTriple{1, 5, 2}));
         std::cout << "[ok] mix multiply identity (single ingredient)\n";
@@ -122,14 +110,14 @@ int main(int argc, char* argv[]) {
 
     // 9. empty ingredient list throws.
     {
-        assert(throwsEngineError([&] { engine.mix({}, "add", 0); }));
+        assert(throwsEngineError([&] { engine.mix({}, "add"); }));
         std::cout << "[ok] mix rejects empty ingredient list\n";
     }
 
     // 10. null ingredient in the list throws (guards the !ing check).
     {
         assert(throwsEngineError([&] {
-            engine.mix(vec({std::shared_ptr<Ingredient>{nullptr}}), "add", 0);
+            engine.mix(vec({std::shared_ptr<Ingredient>{nullptr}}), "add");
         }));
         std::cout << "[ok] mix rejects null ingredient\n";
     }
@@ -137,7 +125,7 @@ int main(int argc, char* argv[]) {
     // 11. unsupported operation throws.
     {
         assert(throwsEngineError([&] {
-            engine.mix(vec({chamomile.clone()}), "divide", 0);
+            engine.mix(vec({chamomile.clone()}), "divide");
         }));
         std::cout << "[ok] mix rejects unknown operation\n";
     }

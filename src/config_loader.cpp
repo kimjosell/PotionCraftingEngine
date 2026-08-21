@@ -21,14 +21,6 @@ DimensionTriple parseDimensionTriple(const json& j) {
     return out;
 }
 
-OperationConfig parseOperation(const std::string& id, const json& j) {
-    OperationConfig op{};
-    op.id = id;
-    op.maxModifier = j.at("max_modifier").get<int>();
-    op.timePerPoint = j.at("time_per_point").get<int>();
-    return op;
-}
-
 PureEffectConfig parsePureEffect(const std::string& id, const json& j) {
     PureEffectConfig eff{};
     eff.id = id;
@@ -116,14 +108,6 @@ EngineConfig parseEngineConfigJson(const json& root) {
     cfg.domains.reserve(domainsJson.size());
     for (auto it = domainsJson.begin(); it != domainsJson.end(); ++it) {
         cfg.domains.push_back(DomainConfig{it.key()});
-    }
-
-    const json& opsJson = root.at("operations");
-    if (!opsJson.is_object()) {
-        throw ConfigParseError("'operations' must be an object");
-    }
-    for (auto it = opsJson.begin(); it != opsJson.end(); ++it) {
-        cfg.operations.emplace(it.key(), parseOperation(it.key(), it.value()));
     }
 
     const json& effectsJson = root.at("effects");
