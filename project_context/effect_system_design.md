@@ -576,13 +576,9 @@ pure effect wins otherwise
   
 
 | β value | Meaning |
-
 |---|---|
-
 | β = 1.0 | Fair fight — geometrically closer effect wins |
-
 | β < 1.0 | Combined effect handicapped — must be significantly closer than pure to win |
-
 | β > 1.0 | Combined effect gets a reach bonus — can win even if somewhat farther |
 
   
@@ -662,13 +658,9 @@ The designer has three independent levers:
   
 
 | Lever | Effect |
-
 |---|---|
-
 | `capture_radius` per effect | Controls how large the landing zone is — directly sets geometric rarity |
-
 | `beta` per combined effect | Controls how combined effects compete against pure — independent of geometry |
-
 | Combined effect domain count | More domains = exponentially rarer by default |
 
   
@@ -782,25 +774,15 @@ or a null effect if the crafted object landed in a dead zone
   
 
 | Principle | Decision |
-
 |---|---|
-
 | One effect per crafted object | At most one — one dominant effect when in range, null effect in a dead zone (no fallback) |
-
 | Pure effects shared across domains | No — each domain has its own independent anchor set |
-
 | Combined effects require all participating domains in range | Yes — all must be within capture radius simultaneously |
-
 | Dominant pure effect selection | Strongest signal wins (smallest distance, any domain) |
-
 | Pure vs. combined competition | Per-combined-effect β threshold |
-
 | Capture radius | Per effect anchor — pure and combined each define their own |
-
 | Player feedback | Domain attribution is visible; distances and formulas are not |
-
 | Discoverability | Opaque but learnable — players reverse-engineer through mixing patterns |
-
 | Primary rarity knobs | capture_radius per effect, β per combined effect, domain count |
 
   
@@ -814,29 +796,17 @@ or a null effect if the crafted object landed in a dead zone
   
 
 | Parameter | Symbol | Role | Configured at |
-
 |---|---|---|---|
-
 | Combined vs. pure bias | β | Threshold multiplier in dominance decision | Per combined effect |
-
 | Capture radius | r | Defines the landing zone sphere around each anchor | Per effect anchor |
-
 | Modulus | m | Value range per dimension: [0, m-1] | Engine block |
-
 | Number of domains | D | Fixed per config | Domains block |
-
 | Dimensions per domain | 3 | Fixed by engine — not configurable | — |
-
 | Neutral center per domain | c = floor(m/2) | Reference point for strength signals | Derived from modulus |
-
 | Max distance in one domain | c × √3 | Normalizes scores to [0,1] if needed | Derived from modulus |
-
 | Time max modifier | — | Max points time can add before cycling | Per mix operation type |
-
 | Time per point | — | Time units per modifier increment | Per mix operation type |
-
 | Alter object exponent range | — | `[1, modulus-2]` for prime modulus | Derived from modulus |
-
 | Alter object exponents | — | One exponent per domain | Per alter object |
 
   

@@ -9,8 +9,7 @@
   "operations": {
     "add":      { "max_modifier": 3, "time_per_point": 10 },
     "subtract": { "max_modifier": 3, "time_per_point": 10 },
-    "multiply": { "max_modifier": 2, "time_per_point": 15 },
-    "alter":    { "max_modifier": 2, "time_per_point": 20 }
+    "multiply": { "max_modifier": 2, "time_per_point": 15 }
   },
   "effects": {
     "pure": {
