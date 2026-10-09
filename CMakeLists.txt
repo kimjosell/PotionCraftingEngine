@@ -66,7 +66,3 @@ else()
     target_compile_options(effect_engine PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(effect_engine_c PRIVATE -Wall -Wextra -Wpedantic)
 endif()
-
-# Micro-benchmarks (time, allocations, thread scaling). Build with -DCMAKE_BUILD_TYPE=Release.
-add_executable(effect_engine_bench src/benchmark.cpp)
-target_link_libraries(effect_engine_bench PRIVATE effect_engine)
