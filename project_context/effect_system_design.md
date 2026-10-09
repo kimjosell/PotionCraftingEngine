@@ -172,8 +172,6 @@ Many objects (source or mysterious) can be combined via addition or multiplicati
 
 result.domain[k].dim[i] = (obj_a.domain[k].dim[i] <op> obj_b.domain[k].dim[i]) mod modulus
 
-  
-
 where <op> is one of: +, ×
 
 and k iterates over all domains, i iterates over all 3 dimensions
@@ -202,8 +200,6 @@ Alter is a binary operation: it takes a target object (source or mysterious) and
 
 result.domain[k].dim[i] = (target.domain[k].dim[i] ^ alter_obj.exponent[k]) mod modulus
 
-  
-
 where k iterates over all domains, i iterates over all 3 dimensions
 
 ```
@@ -221,14 +217,9 @@ where k iterates over all domains, i iterates over all 3 dimensions
 - An alter object cannot participate in mix operations (add, subtract, multiply).
 
   
-
-**No time modifier on alter.** Unlike mix operations, alter does not apply a time modifier. This is a deliberate design choice with two consequences:
-
-  
-
 1. The exponent 1 in any domain produces a *literally* unchanged result for that domain — bit-for-bit identical to the input. This is what makes "selective" alter objects (e.g., `[1, 5, 1, 1]`) meaningful as a mechanic: the player can protect specific domains from any modification.
 
-2. Alter is the only operation in the system that can leave parts of an object completely untouched. Mix operations always introduce some change via the time modifier; alter does not.
+2. Alter is the only operation in the system that can leave parts of an object completely untouched. Mix operations always introduce some change; alter does not.
 
   
 
@@ -240,40 +231,13 @@ Deferring modulus to craft time creates integer overflow risk — multiplication
 
   
 
-### Time modifier
-
-  
-
-After the arithmetic of a **mix** and **subtract** operation is applied and modded, a **time modifier** is computed from the elapsed time passed by the game and added (mix) or subtracted (subtract) uniformly to every dimension of every domain, with mod applied again. Alter operations do not use a time modifier:
-
-  
-
-```
-
-step 1: raw.domain[k].dim[i] = (obj_a.domain[k].dim[i] <op> obj_b.domain[k].dim[i]) mod modulus
-
-step 2: modifier = floor(elapsed_time / time_per_point) mod (max_modifier + 1)
-
-step 3 (mix): result.domain[k].dim[i] = (raw.domain[k].dim[i] + modifier) mod modulus
-
-step 3 (substract): result.domain[k].dim[i] = (raw.domain[k].dim[i] - modifier) mod modulus
-
-```
-
-  
-
-`time_per_point` and `max_modifier` are configured per mix operation type (add, subtract, multiply). Alter has no time configuration. The modifier cycles back to 0 after `(max_modifier + 1) × time_per_point` time units — waiting indefinitely does not push values in one direction forever. The library has no internal clock; elapsed time is always passed in by the game per operation call.
-
-  
-
 ### Recipes — operation history
 
   
 
-Every mysterious object carries a **recipe**: a tree describing the operations and ingredients that produced it. A `Mix` recipe node holds its operation id, the elapsed time used, and references to its N input ingredients. A `Subtract` recipe node hols its operation id, the elapsed time used, and the references to its two input ingredients. An `Alter` recipe node holds the alter object id and a reference to its target ingredient. Because each input ingredient may itself be a mysterious object with its own recipe, recipes nest naturally as trees with source objects at the leaves.
+Every mysterious object carries a **recipe**: a tree describing the operations and ingredients that produced it. A `Mix` recipe node holds its operation id, and references to its N input ingredients. A `Subtract` recipe node hols its operation id, and the references to its two input ingredients. An `Alter` recipe node holds the alter object id and a reference to its target ingredient. Because each input ingredient may itself be a mysterious object with its own recipe, recipes nest naturally as trees with source objects at the leaves.
 
   
-
 Recipes are passed through to crafted objects. They serve three purposes: replay (the game can reconstruct a craft from its recipe given the same engine config), inspection (the game can display the operation history to the player), and debugging. The engine builds recipes as a side effect of mix/alter and attaches them to the returned mysterious object — it does not persist them. Serialization is the game's responsibility.
 
   
@@ -363,6 +327,34 @@ The value is the raw Euclidean distance to the anchor **divided by that anchor's
 Strength is therefore `1 - normalized_distance` (1 at the anchor, 0 at the boundary).
 
 For a pure effect, the map contains exactly one entry: the domain the pure effect belongs to. For a combined effect, the map contains one entry per participating domain, each normalized against that domain's own combined anchor radius.
+
+### Effect distance — the single 0–1 value
+
+  
+
+Presentation usually wants one number, not a map. The **effect distance** is the mean of the per-domain normalized distances:
+
+  
+
+```
+
+effect_distance = (1/m) × Σⱼ nⱼ        where nⱼ = dist(dₖⱼ, Eₖⱼ) / capture_radiusₖⱼ
+
+```
+
+  
+
+-  `0` — the crafted object landed exactly on **every** anchor of the effect. Strongest possible.
+-  `1` — it sits on the capture boundary in every participating domain. Weakest still active.
+-  Strength is `1 - effect_distance`.
+
+  
+
+The result is always in `[0, 1]` without clamping: candidacy (§5) already rejects any effect that is out of range in *any* participating domain, so every `nⱼ ≤ 1`, and the mean of values in `[0, 1]` stays in `[0, 1]`. Averaging (rather than summing) keeps the scale independent of `m`, so a 5-domain combined effect is not penalized against a 2-domain one. A pure effect is the `m = 1` case and needs no special handling. A null effect reports `1`.
+
+  
+
+Normalizing **before** averaging is what makes this comparable: an anchor with radius 12 and one with radius 3 both contribute a fraction of their own reach, never a raw distance in mismatched units.
 
   
 This is **structural feedback** for presentation (a "purity" indicator, a strength bar, or nothing at all) — it is not the score used to pick the winning effect. Dominance is still decided internally on raw distances (§6–§8); the normalized value is only what the crafted object reports outward.
@@ -804,8 +796,6 @@ or a null effect if the crafted object landed in a dead zone
 | Dimensions per domain | 3 | Fixed by engine — not configurable | — |
 | Neutral center per domain | c = floor(m/2) | Reference point for strength signals | Derived from modulus |
 | Max distance in one domain | c × √3 | Normalizes scores to [0,1] if needed | Derived from modulus |
-| Time max modifier | — | Max points time can add before cycling | Per mix operation type |
-| Time per point | — | Time units per modifier increment | Per mix operation type |
 | Alter object exponent range | — | `[1, modulus-2]` for prime modulus | Derived from modulus |
 | Alter object exponents | — | One exponent per domain | Per alter object |
 

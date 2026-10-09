@@ -217,6 +217,12 @@ float effect_engine_crafted_active_domain_distance(const EECrafted* crafted, int
     return crafted->activeDomains[index].second;
 }
 
+float effect_engine_crafted_effect_distance(const EECrafted* crafted) {
+    clearError();
+    if (!crafted) { setError("null crafted"); return -1.0f; }
+    return effectDistance(crafted->crafted.effect);
+}
+
 // ---- Recipe tree traversal ----
 
 const EERecipeNode* effect_engine_ingredient_root(const EEIngredient* ingredient) {

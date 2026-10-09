@@ -141,32 +141,24 @@ The modulus is not what distinguishes object types — **craft is when effect ca
 
 Three **mix** operations (add, subtract, multiply) and one **alter** operation. They differ in shape:
 
-- **Mix operations** take two coordinate-based objects (source or mysterious) of matching shape, combine them dimension-by-dimension within each domain, and apply a time modifier. Output is a mysterious object.
+- **Mix operations** take two coordinate-based objects (source or mysterious) of matching shape, combine them dimension-by-dimension within each domain. Output is a mysterious object.
 
-- **Subtract** takes one coordinate-based object (source or mysterious) as the base and another object as the subtractor (source or mysterious). Each domain of the base object is affected by the subtractor, and apply a time modifier.
+- **Subtract** takes one coordinate-based object (source or mysterious) as the base and another object as the subtractor (source or mysterious). Each domain of the base object is affected by the subtractor.
 
 - **Alter** takes one coordinate-based object (source or mysterious) as the target and one alter object as the exponent input. Each domain of the target is raised to the corresponding exponent from the alter object, applied uniformly across all 3 dimensions. **Alter does not apply a time modifier.** Output is a mysterious object.
 
 ### Mix operation sequence
 
 ```
-step 1: raw.domain[k].dim[i] = (a.domain[k].dim[i] <op> b.domain[k].dim[i]) mod modulus
+raw.domain[k].dim[i] = (a.domain[k].dim[i] <op> b.domain[k].dim[i]) mod modulus
 
-step 2: modifier = floor(elapsed_time / time_per_point) mod (max_modifier + 1)
-
-step 3: result.domain[k].dim[i] = (raw.domain[k].dim[i] + modifier) mod modulus
 ```
-
-The modifier is uniform — the same value added to every dimension of every domain.
 
 ### Subtract operation sequence
 
 ```
-step 1: raw.domain[k].dim[i] = (a.domain[k].dim[i] - b.domain[k].dim[i]) mod modulus
+raw.domain[k].dim[i] = (a.domain[k].dim[i] - b.domain[k].dim[i]) mod modulus
 
-step 2: modifier = floor(elapsed_time / time_per_point) mod (max_modifier + 1)
-
-step 3: result.domain[k].dim[i] = (raw.domain[k].dim[i] - modifier) mod modulus
 ```
 
 ### Alter operation sequence
@@ -177,18 +169,6 @@ result.domain[k].dim[i] = (target.domain[k].dim[i] ^ alter_obj.exponent[k]) mod 
 
 Single step. No time modifier. Within a domain, all 3 dimensions use the same exponent.
 
-### Time modifier config (per mix operation type)
-
-| Parameter | Meaning |
-| ---------------- | -------------------------------------------------- |
-| `max_modifier` | Maximum modifier points before cycling back to 0 |
-| `time_per_point` | Time units required for modifier to increment by 1 |
-
-The modifier cycles — waiting indefinitely does not push values in one direction forever. This prevents time from becoming a trivial farming vector while still rewarding players who learn the rhythm of specific mix operation types. Alter has no time configuration.
-
-### Implicit carry-over
-
-Time influence is permanently baked into a mysterious object's values after each mix operation. When that object feeds into a subsequent operation (mix or alter), those values carry forward naturally. Each mix operation applies its own time config independently. Alter passes carry-over through unchanged in any domain whose exponent is 1, and transforms it via modular exponentiation in any domain with exponent ≥ 2.
 
 ### Type rules at the API boundary
 
@@ -203,7 +183,7 @@ The library validates these rules and rejects mismatches with a clear error:
 ### Example walkthrough — mix
 
 ```
-Config: add, max_modifier=5, time_per_point=10
+Config: add
 
 modulus=11, 2 domains (simplified for readability)
 
@@ -215,7 +195,7 @@ ember_core standard: [ [8,4,6], [2,8,3] ]
 
 
 
-Player mixes via ADD for 30 time units:
+Player mixes via ADD:
 
 
 
@@ -226,22 +206,7 @@ domain 0: [(3+8)%11, (7+4)%11, (2+6)%11] = [0, 0, 8]
 domain 1: [(9+2)%11, (1+8)%11, (5+3)%11] = [0, 9, 8]
 
 
-
-step 2 (time modifier):
-
-modifier = floor(30/10) mod (5+1) = 3 mod 6 = 3
-
-
-
-step 3 (apply modifier + mod):
-
-domain 0: [(0+3)%11, (0+3)%11, (8+3)%11] = [3, 3, 0]
-
-domain 1: [(0+3)%11, (9+3)%11, (8+3)%11] = [3, 1, 0]
-
-
-
-mysterious_1 = [ [3,3,0], [3,1,0] ]
+mysterious_1 = [ [0,0,8], [0,9,8] ]
 
 
 
@@ -451,15 +416,11 @@ Recipe (abstract)
 
 │ + operationId: String // "add" | "multiply"
 
-│ + time: int // elapsed time passed to the mix
-
 │ + ingredients: Ingredient[]
 
 ├──Subtract
 
 | + operationId: String // "subtract"
-
-| + time: int // elapsed time passed to the subtract
 
 | + baseIngredient: Ingredient
 
@@ -606,7 +567,7 @@ engine, "fire_focus", &error
 
 MysteriousObject result = effect_engine_mix(
 
-engine, ingredients, count, "add", elapsed_time, &error
+engine, ingredients, count, "add", &error
 
 );
 
@@ -616,7 +577,7 @@ engine, ingredients, count, "add", elapsed_time, &error
 
 MysteriousObject result = effect_engine_subtract(engine, baseIngredient, 
 
-ingredientToSubtract, elapsed_time);
+ingredientToSubtract);
 
 
 
@@ -704,8 +665,6 @@ effect_engine_list_domains(engine, &out_ids, &out_count);
 
 "domains": { ... },
 
-"operations": { ... },
-
 "effects": {
 
 "pure": { ... },
@@ -748,42 +707,6 @@ effect_engine_list_domains(engine, &out_ids, &out_count);
 ```
 
 Domain order determines the index used for all domain coordinate arrays throughout the config.
-
-### Operations block
-
-The operations block configures the time modifier behavior of the **mix** operations only. Alter has no time configuration and does not appear here.
-
-```json
-"operations": {
-
-"add": {
-
-"max_modifier": 5,
-
-"time_per_point": 10
-
-},
-
-"subtract": {
-
-"max_modifier": 3,
-
-"time_per_point": 20
-
-},
-
-"multiply": {
-
-"max_modifier": 8,
-
-"time_per_point": 5
-
-}
-
-}
-```
-
-`time_per_point` uses whatever in-game time unit the game tracks — the engine treats it as an opaque integer. The game is responsible for passing consistent units.
 
 ### Effects block
 
@@ -1005,8 +928,9 @@ CMake from a single `CMakeLists.txt`:
 | Alter objects | 5–8 distinct, no tiers |
 | Pure effects | ~20 total across all domains |
 | Combined effects | A handful (2–4) spanning 2 domains each |
-| Mix operations | 3 (add, subtract, multiply) with time modifier |
-| Alter operation | 1, no time modifier |
+| Mix operations | 2 (add, multiply) |
+|Subtract opeartion | 1 |
+| Alter operation | 1 |
 | Primary game engine | Godot |
 | Config format | Single JSON file |
 

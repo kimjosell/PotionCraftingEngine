@@ -56,8 +56,8 @@ A few words you'll meet along the way:
 | **Engine** | The loaded library + your config. You make one at startup, destroy it at shutdown. |
 | **Source object** | A raw ingredient from your config (has a name and a "tier", like `"chamomile"` / `"standard"`). |
 | **Mysterious object** | The in-progress result of mixing/altering. Not final yet — you can keep combining it. |
-| **Mix** | Combine 2..N objects (add / multiply). Takes an elapsed "brew time". |
-|**Subtract**| Subtract the value of an object to a base object. Takes an elapsed "time."|
+| **Mix** | Combine 2..N objects (add / multiply).|
+|**Subtract**| Subtract the value of an object to a base object.|
 | **Alter** | Transform one object using a named "alter object" from your config. |
 | **Craft** | The final step: turn a mysterious object into an actual effect. |
 | **Effect** | The result of a craft — an id (e.g. `"calming_brew"`) plus which domains were involved. |
@@ -117,8 +117,8 @@ ginger    = get_source(engine, "ginger", "standard")
 
 ingredients = [chamomile, ginger]
 
-# Mix them with a "brew time" of 30. The result is a mysterious object.
-brew = mix(engine, ingredients, count=2, "add", 30)
+# Mix them. The result is a mysterious object.
+brew = mix(engine, ingredients, count=2, "add")
 
 crafted = craft(engine, brew)
 effect  = crafted.effect_id

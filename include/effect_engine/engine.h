@@ -58,6 +58,20 @@ struct Effect {
     std::unordered_map<std::string, float> activeDomains;
 };
 
+// Single [0,1] distance for the whole effect: the mean of its per-domain normalized
+// distances. 0 = the craft landed exactly on every one of the effect's anchors, 1 = it
+// sits on the capture boundary in all of them. Strength is (1 - this). Averaging keeps
+// the scale independent of how many domains the effect spans, so a 5-domain combined
+// effect is not penalized against a 2-domain one. Every value in activeDomains is
+// already <= 1 because candidacy rejects any effect out of range in any domain (§5), so
+// the mean needs no clamping. A null effect (empty map) reports 1. See §3.5.
+inline float effectDistance(const Effect& effect) {
+    if (effect.activeDomains.empty()) return 1.0f;
+    float sum = 0.0f;
+    for (const auto& kv : effect.activeDomains) sum += kv.second;
+    return sum / static_cast<float>(effect.activeDomains.size());
+}
+
 struct CraftedObject {
     std::shared_ptr<Recipe> recipe;
     Effect effect;

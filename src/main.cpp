@@ -2,6 +2,7 @@
 #include "effect_engine/config_loader.h"
 
 #include <cassert>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -162,7 +163,22 @@ int main(int argc, char* argv[]) {
         CraftedObject crafted = engine.craft(dead);
         assert(crafted.effect.effectId.empty());
         assert(crafted.effect.activeDomains.empty());
+        assert(effectDistance(crafted.effect) == 1.0f); // null effect is maximally weak
         std::cout << "[ok] craft dead zone -> null effect\n";
+    }
+
+    // 15. effectDistance averages the per-domain values of a combined effect (§3.5).
+    //     Distance 1 from both anchors: harmony_tea beats the tied pure score via its
+    //     beta, and each domain normalizes to 1/2.5 = 0.4, so the mean is 0.4 too.
+    {
+        MysteriousObject obj{};
+        obj.id = "mysteriousObject";
+        obj.dimensions = {DimensionTriple{5, 2, 3}, DimensionTriple{6, 3, 4}};
+        CraftedObject crafted = engine.craft(obj);
+        assert(crafted.effect.effectId == "harmony_tea");
+        assert(crafted.effect.activeDomains.size() == 2);
+        assert(std::fabs(effectDistance(crafted.effect) - 0.4f) < 1e-6f);
+        std::cout << "[ok] effectDistance harmony_tea -> 0.4\n";
     }
 
     std::cout << "\nAll tests passed.\n";

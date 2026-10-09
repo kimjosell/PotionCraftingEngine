@@ -94,6 +94,11 @@ EE_API const char* effect_engine_crafted_active_domain_id(const EECrafted* craft
    divided by the anchor's capture_radius, so it is comparable across effects with
    different radii. Returns -1 on a bad index. See design paper §3.5. */
 EE_API float       effect_engine_crafted_active_domain_distance(const EECrafted* crafted, int index);
+/* Single normalized distance for the whole effect in [0,1]: the mean of the per-domain
+   values above. 0 = on every anchor (strongest), 1 = on the capture boundary in every
+   domain (weakest). Strength is (1 - value). Returns 1 for a null effect, -1 on a null
+   argument. See design paper §3.5. */
+EE_API float       effect_engine_crafted_effect_distance(const EECrafted* crafted);
 
 /* ---- Recipe tree traversal (non-owning views) ----
    Lets the caller walk the binary tree of how an object was built: which operation

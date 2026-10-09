@@ -163,7 +163,7 @@ MysteriousObject Engine::subtract(const Ingredient& baseIngredient, const Ingred
             const int a = baseIngredient.dimensions[k][i];
             const int b = ingredientToSubtract.dimensions[k][i];
             int raw = a - b;
-            // step 1: arithmetic % mod  →  step 3: (raw + modifier) % mod
+            // arithmetic % mod 
             result.dimensions[k][i] = mod(raw, modulus);
         }
     }
@@ -209,7 +209,7 @@ MysteriousObject Engine::mix(const std::vector<std::shared_ptr<Ingredient>>& ing
                 }
                 else throw EngineError("unsupported mix operation" + operationId);
             }
-            result.dimensions[k][i] = mod(raw, modulus);
+            result.dimensions[k][i] = static_cast<int>(raw);
         }
     }
 
