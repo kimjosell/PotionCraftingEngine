@@ -19,10 +19,7 @@ static bool throwsEngineError(const std::function<void()>& fn) {
     return false;
 }
 
-static std::vector<std::shared_ptr<Ingredient>> vec(
-    std::initializer_list<std::shared_ptr<Ingredient>> l) {
-    return {l};
-}
+
 
 int main(int argc, char* argv[]) {
     const std::string configPath = (argc > 1)
@@ -78,7 +75,7 @@ int main(int argc, char* argv[]) {
     // 5. add, two ingredients, time 0: (a+b) % 7.
     //    domain0 [6,6,4], domain1 [6,1,6].
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "add");
+        MysteriousObject r = engine.mix({chamomile.clone(), ginger.clone()}, "add");
         assert((r.dimensions[0] == DimensionTriple{6, 6, 4}));
         assert((r.dimensions[1] == DimensionTriple{6, 1, 6}));
         std::cout << "[ok] mix add (2 ingredients) matches (a+b) % modulus\n";
@@ -87,7 +84,7 @@ int main(int argc, char* argv[]) {
     // 6. multiply, two ingredients, (a*b) % 7. Seed starts at 1.
     //    domain0 [1,1,3], domain1 [5,1,1].
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone(), ginger.clone()}), "multiply");
+        MysteriousObject r = engine.mix({chamomile.clone(), ginger.clone()}, "multiply");
         assert((r.dimensions[0] == DimensionTriple{1, 1, 3}));
         assert((r.dimensions[1] == DimensionTriple{5, 1, 1}));
         std::cout << "[ok] mix multiply (2 ingredients) matches (a*b) % modulus\n";
@@ -95,7 +92,7 @@ int main(int argc, char* argv[]) {
 
     // 7. add identity: a single ingredient returns itself % modulus (seed 0).
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "add");
+        MysteriousObject r = engine.mix({chamomile.clone()}, "add");
         assert((r.dimensions[0] == DimensionTriple{4, 2, 3}));
         assert((r.dimensions[1] == DimensionTriple{1, 5, 2}));
         std::cout << "[ok] mix add identity (single ingredient)\n";
@@ -103,7 +100,7 @@ int main(int argc, char* argv[]) {
 
     // 8. multiply identity: a single ingredient returns itself % modulus (seed 1).
     {
-        MysteriousObject r = engine.mix(vec({chamomile.clone()}), "multiply");
+        MysteriousObject r = engine.mix({chamomile.clone()}, "multiply");
         assert((r.dimensions[0] == DimensionTriple{4, 2, 3}));
         assert((r.dimensions[1] == DimensionTriple{1, 5, 2}));
         std::cout << "[ok] mix multiply identity (single ingredient)\n";
@@ -118,7 +115,7 @@ int main(int argc, char* argv[]) {
     // 10. null ingredient in the list throws (guards the !ing check).
     {
         assert(throwsEngineError([&] {
-            engine.mix(vec({std::shared_ptr<Ingredient>{nullptr}}), "add");
+            engine.mix({std::shared_ptr<Ingredient>{nullptr}}, "add");
         }));
         std::cout << "[ok] mix rejects null ingredient\n";
     }
@@ -126,7 +123,7 @@ int main(int argc, char* argv[]) {
     // 11. unsupported operation throws.
     {
         assert(throwsEngineError([&] {
-            engine.mix(vec({chamomile.clone()}), "divide");
+            engine.mix({chamomile.clone()}, "divide");
         }));
         std::cout << "[ok] mix rejects unknown operation\n";
     }

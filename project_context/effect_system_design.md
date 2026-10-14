@@ -324,7 +324,7 @@ The value is the raw Euclidean distance to the anchor **divided by that anchor's
 
   
 
-Strength is therefore `1 - normalized_distance` (1 at the anchor, 0 at the boundary).
+Note that this value is a **distance**, so lower means stronger. The engine only reports distances; it does not compute a separate "strength" value. Consumers that want a strength scale (higher = stronger) can derive it as `strength = 1 - normalized_distance`, which gives 1 at the anchor and 0 at the boundary.
 
 For a pure effect, the map contains exactly one entry: the domain the pure effect belongs to. For a combined effect, the map contains one entry per participating domain, each normalized against that domain's own combined anchor radius.
 

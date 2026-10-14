@@ -141,7 +141,7 @@ The modulus is not what distinguishes object types — **craft is when effect ca
 
 Three **mix** operations (add, subtract, multiply) and one **alter** operation. They differ in shape:
 
-- **Mix operations** take two coordinate-based objects (source or mysterious) of matching shape, combine them dimension-by-dimension within each domain. Output is a mysterious object.
+- **Mix operations** take two or more coordinate-based objects (source or mysterious) of matching shape, combine them dimension-by-dimension within each domain. Output is a mysterious object.
 
 - **Subtract** takes one coordinate-based object (source or mysterious) as the base and another object as the subtractor (source or mysterious). Each domain of the base object is affected by the subtractor.
 
@@ -446,8 +446,6 @@ The natural shape of mix and alter operations is a tree: a `Mix` has many childr
 
 - For `Mix`, `operationId` matches an entry in the `operations` block of the config: `"add"`, or `"multiply"`.
 
-- For `subtract`, `operationId` is the entry of `"subtract"` it is important to declare this in the `JSON` file so the block for time and the modifier ofr time are added.
-
 - For `Alter`, `operationId` is the fixed sentinel string `"exponentiation"`. This id is **not** present in the config's `operations` block — alter has no time configuration and is not a configurable operation type. The sentinel exists only so that the `Recipe` base class can carry a uniform `operationId` field for any subclass.
 
 ### What recipes are for
@@ -573,7 +571,6 @@ engine, ingredients, count, "add", &error
 
 //Subtract: takes two Ingredients (sourceObject or MysteriousObject).
 
-//elapsed_time in whatever units match time_per_point in config
 
 MysteriousObject result = effect_engine_subtract(engine, baseIngredient, 
 
@@ -796,59 +793,33 @@ Notes on capture_radius and β:
 
 ```json
 "source_objects": {
-
-"soul_stone": {
-
-"tiers": {
-
-"standard": [
-
-[3, 7, 2],
-
-[9, 1, 5],
-
-[4, 8, 3],
-
-[6, 2, 7]
-
-],
-
-"high_quality": [
-
-[4, 8, 3],
-
-[9, 2, 6],
-
-[5, 9, 4],
-
-[7, 3, 8]
-
-]
-
-}
-
-},
-
-"ember_core": {
-
-"tiers": {
-
-"standard": [
-
-[8, 4, 6],
-
-[2, 8, 3],
-
-[7, 1, 9],
-
-[3, 6, 2]
-
-]
-
-}
-
-}
-
+    "soul_stone": {
+        "tiers": {
+            "standard": [
+                [3, 7, 2],
+                [9, 1, 5],
+                [4, 8, 3],
+                [6, 2, 7]
+                ],
+            
+            "high_quality": [
+                [4, 8, 3],
+                [9, 2, 6],
+                [5, 9, 4],
+                [7, 3, 8]
+                ]
+            }
+        },
+    "ember_core": {
+        "tiers": {
+            "standard": [
+                [8, 4, 6],
+                [2, 8, 3],
+                [7, 1, 9],
+                [3, 6, 2]
+            ]
+        }
+    }
 }
 ```
 

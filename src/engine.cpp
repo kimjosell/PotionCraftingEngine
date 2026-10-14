@@ -196,7 +196,9 @@ MysteriousObject Engine::mix(const std::vector<std::shared_ptr<Ingredient>>& ing
     result.dimensions.resize(domainCount);
     for (std::size_t k = 0; k < domainCount; ++k) {
         for (std::size_t i = 0; i < kDimensionsPerDomain; ++i) {
-
+            
+            //raw starts at 1 when operationId is multiplying because if raw starts at 0 multiplying by 0 will led always to 0
+            //It also starts at 0 when its addition.
             long long raw = (operationId == "multiply") ? 1 : 0;
 
             for (const auto& ing : ingredients){
