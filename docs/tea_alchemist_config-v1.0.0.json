@@ -1,0 +1,56 @@
+{
+  "engine": {
+    "modulus": 7
+  },
+  "domains": {
+    "leaf": { "display_name": "Leaf" },
+    "root": { "display_name": "Root" }
+  },
+  "effects": {
+    "pure": {
+      "calming_brew": {
+        "domain": "leaf",
+        "anchor": [5, 2, 4],
+        "capture_radius": 2.0
+      },
+      "warming_brew": {
+        "domain": "root",
+        "anchor": [6, 3, 5],
+        "capture_radius": 2.0
+      }
+    },
+    "combined": {
+      "harmony_tea": {
+        "domains": ["leaf", "root"],
+        "beta": 1.1,
+        "anchors": {
+          "leaf": { "coords": [5, 2, 4], "capture_radius": 2.5 },
+          "root": { "coords": [6, 3, 5], "capture_radius": 2.5 }
+        }
+      }
+    }
+  },
+  "source_objects": {
+    "chamomile": {
+      "tiers": {
+        "standard": [
+          [4, 2, 3],
+          [1, 5, 2]
+        ]
+      }
+    },
+    "ginger": {
+      "tiers": {
+        "standard": [
+          [2, 4, 1],
+          [5, 3, 4]
+        ]
+      }
+    }
+  },
+"alter_objects": {
+  "fire_focus":     { "exponents": [1, 5] },
+  "root_amplifier": { "exponents": [3, 1] },
+  "pure_amplifier": { "exponents": [3, 3] }
+}
+}

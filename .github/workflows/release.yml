@@ -1,6 +1,6 @@
 name: Build & Release libraries
 
-# Corre al empujar un tag vX.Y.Z, o manualmente desde la pestaña Actions.
+# Runs when a vX.Y.Z tag is pushed, or manually from the Actions tab.
 on:
   push:
     tags: ["v*"]

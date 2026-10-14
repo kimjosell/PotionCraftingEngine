@@ -1,6 +1,7 @@
 #include "effect_engine/effect_engine_c.h"
 #include "effect_engine/engine.h"
 
+#include <cstddef>
 #include <iterator>
 #include <memory>
 #include <string>
@@ -102,13 +103,37 @@ EEIngredient* effect_engine_get_source(EffectEngine* engine,
 }
 
 EEIngredient* effect_engine_mix(EffectEngine* engine,
-                                const EEIngredient* a, const EEIngredient* b,
-                                const char* operation_id, int elapsed_time) {
+                                const EEIngredient* const* ingredients,
+                                size_t count,
+                                const char* operation_id) {
     clearError();
-    if (!engine || !a || !b || !operation_id) { setError("null argument"); return nullptr; }
+    if (!engine || !ingredients || count == 0 || !operation_id) { setError("null or empty argument"); return nullptr; }
+    try {
+
+        std::vector<std::shared_ptr<Ingredient>> cpp_ingredients;
+        cpp_ingredients.reserve(count);
+
+        for (size_t i = 0; i < count; ++i){
+            if(!ingredients[i] || !ingredients[i]->obj){
+                setError("null ingredient element in list");
+                return nullptr;
+            }
+            cpp_ingredients.push_back(ingredients[i]->obj);
+        };
+
+        MysteriousObject res =
+            engine->engine.mix(cpp_ingredients, operation_id);
+        return new EEIngredient{ std::make_shared<MysteriousObject>(std::move(res)) };
+    } catch (const std::exception& ex) { setError(ex.what()); return nullptr; }
+}
+
+EEIngredient* effect_engine_subtract(EffectEngine* engine,
+                                const EEIngredient* baseIngredient, const EEIngredient* ingredientToSubstract) {
+    clearError();
+    if (!engine || !baseIngredient || !ingredientToSubstract) { setError("null argument"); return nullptr; }
     try {
         MysteriousObject res =
-            engine->engine.mix(*a->obj, *b->obj, operation_id, elapsed_time);
+            engine->engine.subtract(*baseIngredient->obj, *ingredientToSubstract->obj);
         return new EEIngredient{ std::make_shared<MysteriousObject>(std::move(res)) };
     } catch (const std::exception& ex) { setError(ex.what()); return nullptr; }
 }
@@ -192,6 +217,12 @@ float effect_engine_crafted_active_domain_distance(const EECrafted* crafted, int
     return crafted->activeDomains[index].second;
 }
 
+float effect_engine_crafted_effect_distance(const EECrafted* crafted) {
+    clearError();
+    if (!crafted) { setError("null crafted"); return -1.0f; }
+    return effectDistance(crafted->crafted.effect);
+}
+
 // ---- Recipe tree traversal ----
 
 const EERecipeNode* effect_engine_ingredient_root(const EEIngredient* ingredient) {
@@ -212,8 +243,9 @@ int effect_engine_node_kind(const EERecipeNode* node) {
     if (dynamic_cast<const SourceObject*>(asIngredient(node))) return EE_NODE_SOURCE;
     const Recipe* recipe = nodeRecipe(node);
     if (!recipe) { setError("node has no recipe"); return -1; }
-    if (dynamic_cast<const MixRecipe*>(recipe))   return EE_NODE_MIX;
-    if (dynamic_cast<const AlterRecipe*>(recipe)) return EE_NODE_ALTER;
+    if (dynamic_cast<const MixRecipe*>(recipe))       return EE_NODE_MIX;
+    if (dynamic_cast<const AlterRecipe*>(recipe))     return EE_NODE_ALTER;
+    if (dynamic_cast<const SubtractRecipe*>(recipe)) return EE_NODE_SUBTRACT;
     setError("unknown recipe kind"); return -1;
 }
 
@@ -235,14 +267,6 @@ const char* effect_engine_node_operation_id(const EERecipeNode* node) {
     if (!node) { setError("null node"); return ""; }
     const Recipe* recipe = nodeRecipe(node);
     return recipe ? recipe->operationId.c_str() : "";
-}
-
-int effect_engine_node_time(const EERecipeNode* node) {
-    clearError();
-    if (!node) { setError("null node"); return -1; }
-    const auto* mix = dynamic_cast<const MixRecipe*>(nodeRecipe(node));
-    if (!mix) { setError("node is not a mix"); return -1; }
-    return mix->time;
 }
 
 const char* effect_engine_node_alter_object_id(const EERecipeNode* node) {
@@ -269,8 +293,9 @@ int effect_engine_node_child_count(const EERecipeNode* node) {
     if (!node) { setError("null node"); return -1; }
     const Recipe* recipe = nodeRecipe(node);
     if (!recipe) return 0;                                   // source leaf
-    if (dynamic_cast<const MixRecipe*>(recipe))   return 2;
-    if (dynamic_cast<const AlterRecipe*>(recipe)) return 1;
+    if (const auto* mix = dynamic_cast<const MixRecipe*>(recipe)) return static_cast<int>(mix->ingredients.size());
+    if (dynamic_cast<const AlterRecipe*>(recipe))     return 1;
+    if (dynamic_cast<const SubtractRecipe*>(recipe)) return 2;
     setError("unknown recipe kind"); return -1;
 }
 
@@ -278,9 +303,14 @@ const EERecipeNode* effect_engine_node_child(const EERecipeNode* node, int index
     clearError();
     if (!node) { setError("null node"); return nullptr; }
     const Recipe* recipe = nodeRecipe(node);
-    if (const auto* mix = dynamic_cast<const MixRecipe*>(recipe)) {
-        if (index == 0) return asNode(mix->ingredientA.get());
-        if (index == 1) return asNode(mix->ingredientB.get());
+    if(const auto* mix = dynamic_cast<const MixRecipe*>(recipe)){
+        if(index >= 0 && static_cast<std::size_t>(index) < mix->ingredients.size()){
+                return asNode(mix->ingredients[index].get());
+            }
+    }
+    else if (const auto* subtract = dynamic_cast<const SubtractRecipe*>(recipe)) {
+        if (index == 0) return asNode(subtract->baseIngredient.get());
+        if (index == 1) return asNode(subtract->ingredientToSubtract.get());
     } else if (const auto* alter = dynamic_cast<const AlterRecipe*>(recipe)) {
         if (index == 0) return asNode(alter->ingredient.get());
     }

@@ -16,12 +16,6 @@ struct DomainConfig {
     std::string id;
 };
 
-struct OperationConfig {
-    std::string id;
-    int maxModifier;
-    int timePerPoint;
-};
-
 struct AnchorConfig {
     DimensionTriple anchor;
     float captureRadius;
@@ -57,7 +51,6 @@ struct AlterObjectConfig {
 struct EngineConfig {
     int modulus = 0;
     std::vector<DomainConfig> domains;
-    std::unordered_map<std::string, OperationConfig> operations;
     std::vector<PureEffectConfig> pureEffects;
     std::vector<CombinedEffectConfig> combinedEffects;
     std::unordered_map<std::string, SourceObjectConfig> sourceObjects;
