@@ -6,12 +6,6 @@
     "leaf": { "display_name": "Leaf" },
     "root": { "display_name": "Root" }
   },
-  "operations": {
-    "add":      { "max_modifier": 3, "time_per_point": 10 },
-    "subtract": { "max_modifier": 3, "time_per_point": 10 },
-    "multiply": { "max_modifier": 2, "time_per_point": 15 },
-    "alter":    { "max_modifier": 2, "time_per_point": 20 }
-  },
   "effects": {
     "pure": {
       "calming_brew": {

@@ -209,7 +209,7 @@ MysteriousObject Engine::mix(const std::vector<std::shared_ptr<Ingredient>>& ing
                 else if(operationId == "multiply"){
                     raw = mod(raw * val, modulus);
                 }
-                else throw EngineError("unsupported mix operation" + operationId);
+                else throw EngineError("unsupported mix operation " + operationId);
             }
             result.dimensions[k][i] = static_cast<int>(raw);
         }

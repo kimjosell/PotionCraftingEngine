@@ -108,7 +108,7 @@ The modulus is not what distinguishes object types — **craft is when effect ca
 
 ---
 
-## 5. Operations and the Time Modifier
+## 5. Operations
 
 ### The four operations
 
